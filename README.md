@@ -23,7 +23,7 @@
 
 需要 **Windows 10 / 11、Node.js 20 或更新版本，以及已安装并用 ChatGPT 订阅登录的 Codex 桌面端**。
 
-1. 打开 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest)，在 **Assets** 中下载 **`GPT娘额度挂件-v1.2.3-Windows.zip`**。也可以使用 **Code → Download ZIP** 获取当前源码。
+1. 打开 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest)，在 **Assets** 中下载 **`gpt-niang-usage-widget-v1.2.3-windows.zip`**。也可以使用 **Code → Download ZIP** 获取当前源码。
 2. 将压缩包**完整解压**到准备长期保留的位置；保留 `.agents` 与 `gpt-niang-usage` 文件夹。
 3. 双击根目录的 **`安装GPT娘.cmd`**，等待安装完成。
 4. 打开 Codex 主窗口，龙娘会自动出现。额度查询工具可在新建的聊天中使用。
