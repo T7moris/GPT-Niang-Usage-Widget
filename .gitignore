@@ -1,0 +1,16 @@
+**/installation.json
+**/settings.json
+**/runtime.json
+**/presence.json
+**/status.json
+**/*-status.json
+**/*-error.txt
+**/*.flag
+**/*.tmp
+**/*.bak
+**/node_modules/
+.test-state/
+dist/
+*.zip
+Thumbs.db
+.DS_Store
