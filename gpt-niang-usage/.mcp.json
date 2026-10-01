@@ -1,0 +1,1 @@
+{"mcpServers":{"gpt-niang-usage":{"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/runtime/mcp.mjs"]}}}

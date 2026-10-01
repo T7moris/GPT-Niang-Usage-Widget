@@ -1,0 +1,20 @@
+{
+  "name": "gpt-niang-usage",
+  "version": "1.2.3",
+  "description": "白发紫瞳龙娘挂件：显示当前 Codex 5 小时和每周订阅额度。",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "GPT娘额度挂件",
+    "shortDescription": "半身龙娘挂件，额度与语录依次切换。",
+    "longDescription": "按用户角色参考制作的 Windows 本地挂件。随 Codex 主窗口显示并跟随窗口遮挡，支持拖动和缩放，每分钟读取官方订阅额度，点击角色展开剩余额度与语录气泡。",
+    "developerName": "T7moris",
+    "category": "Productivity",
+    "capabilities": ["Interactive"],
+    "defaultPrompt": ["让 GPT 娘反馈当前额度用量"],
+    "brandColor": "#9B86C1",
+    "composerIcon": "./assets/gpt-dragon-niang-bust.png",
+    "logo": "./assets/gpt-dragon-niang-bust.png"
+  },
+  "license": "MIT",
+  "keywords": ["codex","quota","widget"]
+}

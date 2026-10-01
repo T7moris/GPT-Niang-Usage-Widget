@@ -4,7 +4,7 @@
 
 **Windows 桌面挂件 · 5 小时 / 每周额度 · 中文语录 · 当前版本 1.2.3**
 
-[**下载最新版**](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest) · [安装方法](#安装) · [更新记录](更新记录.md) · [反馈问题](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new/choose)
+[**下载最新版**](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest) · [安装方法](#安装) · [更新记录](更新记录.md) · [反馈问题](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new)
 
 <img src="gpt-niang-usage/assets/gpt-dragon-niang-bust.png" alt="无嘴巴的白发龙娘半身形象" width="240">
 
@@ -88,9 +88,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\gpt-niang-usage\Instal
 
 ## 反馈与参与
 
-遇到问题可以 [提交中文问题反馈](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new/choose)。请说明 Windows / Codex / 挂件版本、复现步骤以及期望效果；截图请裁去对话、账号和其他私人信息。不要上传登录文件或整个状态目录。
+遇到问题可以 [提交中文问题反馈](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new)。请说明 Windows / Codex / 挂件版本、复现步骤以及期望效果；截图请裁去对话、账号和其他私人信息。不要上传登录文件或整个状态目录。
 
-欢迎改进窗口兼容性、安装流程和可读性。提交代码前请阅读 [贡献说明](CONTRIBUTING.md)，并运行上面的检查。这个版本的角色是静态半身配合按压动画；不包含完整桌宠动作或 macOS / Linux 支持。
+欢迎改进窗口兼容性、安装流程和可读性；改动后请运行上面的检查。这个版本的角色是静态半身配合按压动画；不包含完整桌宠动作或 macOS / Linux 支持。
 
 ## 致谢与许可
 
