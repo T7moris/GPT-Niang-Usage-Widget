@@ -1,0 +1,66 @@
+name: Test and publish Windows release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - gpt-niang-usage/package.json
+      - gpt-niang-usage/.codex-plugin/plugin.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check version and release availability
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content gpt-niang-usage/package.json -Raw | ConvertFrom-Json).version
+          $manifest = Get-Content gpt-niang-usage/.codex-plugin/plugin.json -Raw | ConvertFrom-Json
+          if ($version -notmatch '^\d+\.\d+\.\d+$' -or $manifest.version -ne $version) {
+            throw 'Invalid or inconsistent release version.'
+          }
+          $tag = "v$version"
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          gh release list --repo $env:GITHUB_REPOSITORY --limit 100 --json tagName | Out-File releases.json -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read existing releases.' }
+          $releases = Get-Content releases.json -Raw | ConvertFrom-Json
+          if ($releases.tagName -contains $tag) { throw "Release $tag already exists; increment the version first." }
+      - name: Node runtime tests
+        working-directory: gpt-niang-usage
+        run: npm test
+      - name: Prepare isolated installer executable fixture
+        shell: pwsh
+        run: |
+          # Installer tests only check this path; they do not query a real account.
+          $fixture = Join-Path $env:RUNNER_TEMP 'gpt-niang-test-bin'
+          New-Item -ItemType Directory -Path $fixture -Force | Out-Null
+          Copy-Item (Get-Command node.exe).Source (Join-Path $fixture 'codex.exe')
+          $fixture | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Windows installer, lifecycle and WPF tests
+        working-directory: gpt-niang-usage
+        run: npm run test:windows
+      - name: Build and verify Windows bundle
+        run: python scripts/build-release.py
+      - name: Publish release and assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $archive = "dist/gpt-niang-usage-widget-$env:RELEASE_TAG-windows.zip"
+          gh release create $env:RELEASE_TAG $archive dist/SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title $env:RELEASE_TAG --notes-file dist/release-notes.md --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
