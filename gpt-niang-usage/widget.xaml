@@ -31,11 +31,12 @@
       <Path x:Name="BubbleShape" Fill="#FFFFFF" Stroke="#745A98" StrokeThickness="4"
             StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
             Data="M 283,85 A 128,79 0 1 0 27,85 A 128,79 0 0 0 114,160 A 20,10 0 0 0 149,164 A 128,79 0 0 0 283,85 Z"/>
-      <Grid x:Name="SceneText" Canvas.Left="63" Canvas.Top="25" Width="184" Height="125" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
+      <Grid x:Name="SceneText" Canvas.Left="63" Canvas.Top="25" Width="184" Height="115" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
         <Grid.RenderTransform><ScaleTransform x:Name="TextFacingScale"/></Grid.RenderTransform>
-      <StackPanel x:Name="QuotaText">
+      <StackPanel x:Name="QuotaText" VerticalAlignment="Center">
         <TextBlock x:Name="Header" Text="剩余额度" HorizontalAlignment="Center" FontSize="14" FontWeight="SemiBold" Foreground="#745A98"/>
-        <Grid Margin="0,3,0,0" Height="34">
+        <StackPanel x:Name="ShortRow" Margin="0,3,0,0">
+        <Grid Height="30">
           <TextBlock Text="5 小时" FontSize="14" VerticalAlignment="Center" Foreground="#76638D"/>
           <TextBlock x:Name="ShortLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="28" FontWeight="Bold" Foreground="#745A98"/>
         </Grid>
@@ -46,7 +47,9 @@
           <TextBlock x:Name="ShortReset" Text="等待额度数据" FontSize="8" Foreground="#B2A4C4"/>
           <TextBlock x:Name="ShortUsed" Text="已用 —" HorizontalAlignment="Right" FontSize="8" Foreground="#B2A4C4"/>
         </Grid>
-        <Grid Margin="0,8,0,0" Height="34">
+        </StackPanel>
+        <StackPanel x:Name="WeekRow" Margin="0,8,0,0">
+        <Grid Height="30">
           <TextBlock Text="每周" FontSize="14" VerticalAlignment="Center" Foreground="#76638D"/>
           <TextBlock x:Name="WeekLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="28" FontWeight="Bold" Foreground="#745A98"/>
         </Grid>
@@ -57,6 +60,7 @@
           <TextBlock x:Name="WeekReset" Text="等待额度数据" FontSize="8" Foreground="#B2A4C4"/>
           <TextBlock x:Name="WeekUsed" Text="已用 —" HorizontalAlignment="Right" FontSize="8" Foreground="#B2A4C4"/>
         </Grid>
+        </StackPanel>
         <TextBlock x:Name="Status" Visibility="Collapsed" Text="正在读取额度…"/>
       </StackPanel>
         <TextBlock x:Name="QuoteText" Visibility="Collapsed" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="20" FontWeight="Bold" LineHeight="25" Foreground="#745A98" Text="我在这儿，慢慢来就好。"/>

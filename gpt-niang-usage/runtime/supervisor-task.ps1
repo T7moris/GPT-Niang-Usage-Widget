@@ -1,7 +1,52 @@
-function Get-WidgetSupervisorInfo {
-  param([Parameter(Mandatory=$true)][string]$AppDir)
+function Get-WidgetInstallationDataDir {
+  param([Parameter(Mandatory=$true)][string]$AppDir,[Parameter(Mandatory=$true)]$Configuration)
+  if(![string]$Configuration.appDir -or ![string]$Configuration.dataDir){throw 'Installation paths are missing.'}
   $root=[IO.Path]::GetFullPath($AppDir).TrimEnd('\')
-  $config=Get-Content -LiteralPath (Join-Path $root 'installation.json') -Raw -Encoding UTF8 -ErrorAction Stop|ConvertFrom-Json
+  $previousRoot=[IO.Path]::GetFullPath([string]$Configuration.appDir).TrimEnd('\')
+  $data=[IO.Path]::GetFullPath([string]$Configuration.dataDir)
+  if($previousRoot-ine $root){
+    # A moved installation may retain its preferences, but a copied active one may not claim the same registration.
+    if(Test-Path -LiteralPath $previousRoot){throw 'The original installation folder still exists. Disable and move it before reinstalling.'}
+    $disabled=[bool]$Configuration.disabledAt -or (Test-Path -LiteralPath (Join-Path $data 'supervisor-disabled.flag'))
+    if(!$disabled){throw 'Installation was moved without disabling it first.'}
+  }
+  return $data
+}
+
+function Test-WidgetStartupShortcutIdentity {
+  param([Parameter(Mandatory=$true)]$Shortcut,[Parameter(Mandatory=$true)][string]$AppDir)
+  $expectedExecute=Join-Path $env:WINDIR 'System32\wscript.exe'
+  $expectedArguments='"'+(Join-Path ([IO.Path]::GetFullPath($AppDir)) 'launch.vbs')+'"'
+  return [bool]($Shortcut.TargetPath -and [IO.Path]::GetFullPath([string]$Shortcut.TargetPath)-ieq $expectedExecute -and [string]$Shortcut.Arguments-ieq $expectedArguments)
+}
+
+function Stop-WidgetGui {
+  param([Parameter(Mandatory=$true)][string]$AppDir,[Parameter(Mandatory=$true)][string]$DataDir)
+  $null=New-Item -ItemType Directory -Path $DataDir -Force
+  [IO.File]::WriteAllText((Join-Path $DataDir 'stop.flag'),'stop')
+  $runtime=$null
+  try{$runtime=Get-Content -LiteralPath (Join-Path $DataDir 'runtime.json') -Raw -Encoding UTF8|ConvertFrom-Json}catch{}
+  $guiPid=0
+  if(!$runtime -or ![int]::TryParse([string]$runtime.pid,[ref]$guiPid) -or $guiPid-le 0){return}
+  $process=Get-CimInstance Win32_Process -Filter ('ProcessId='+$guiPid) -ErrorAction Stop
+  $expectedGui='"'+(Join-Path $AppDir 'widget.ps1')+'"'
+  if(!$process -or $process.Name-notin @('powershell.exe','pwsh.exe') -or ![string]$process.CommandLine -or $process.CommandLine.IndexOf($expectedGui,[StringComparison]::OrdinalIgnoreCase)-lt 0){return}
+  $deadline=[DateTime]::UtcNow.AddSeconds(6)
+  do{
+    $current=Get-CimInstance Win32_Process -Filter ('ProcessId='+$guiPid) -ErrorAction Stop
+    # Do not wait for an unrelated process that reused the previous GUI's PID.
+    if(!$current -or $current.CreationDate-ne $process.CreationDate){return}
+    Start-Sleep -Milliseconds 100
+  }while([DateTime]::UtcNow-lt $deadline)
+  throw 'The previous widget did not stop within 6 seconds.'
+}
+
+function Get-WidgetSupervisorInfo {
+  param([Parameter(Mandatory=$true)][string]$AppDir,$Configuration=$null)
+  $root=[IO.Path]::GetFullPath($AppDir).TrimEnd('\')
+  $config=$Configuration
+  if(!$config){$config=Get-Content -LiteralPath (Join-Path $root 'installation.json') -Raw -Encoding UTF8 -ErrorAction Stop|ConvertFrom-Json}
+  if(![string]$config.appDir -or ![string]$config.dataDir){throw 'Installation paths are missing.'}
   if([IO.Path]::GetFullPath([string]$config.appDir).TrimEnd('\')-ine $root){throw 'Supervisor installation identity mismatch.'}
   $data=[IO.Path]::GetFullPath([string]$config.dataDir)
   $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -113,19 +158,32 @@ function Stop-WidgetSupervisorTask {
   param([Parameter(Mandatory=$true)][string]$AppDir)
   $info=Get-WidgetSupervisorInfo $AppDir
   $task=Get-WidgetSupervisorTask $info
+  # Task state alone does not prove its child PowerShell has exited.
+  $expectedScript='"'+(Join-Path $info.AppDir 'runtime\supervisor.ps1')+'"'
+  $processes=@(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='pwsh.exe'" -ErrorAction Stop|Where-Object{
+    [string]$_.CommandLine -and $_.CommandLine.IndexOf($expectedScript,[StringComparison]::OrdinalIgnoreCase)-ge 0
+  })
   $null=New-Item -ItemType Directory -Path $info.DataDir -Force
   [IO.File]::WriteAllText((Join-Path $info.DataDir 'supervisor-stop.flag'),'stop')
   if($task -and [string]$task.State-eq 'Running'){
     Stop-ScheduledTask -TaskName $info.TaskName -TaskPath $info.TaskPath -ErrorAction Stop
-    $deadline=[DateTime]::UtcNow.AddSeconds(6)
-    do{
+  }
+  $deadline=[DateTime]::UtcNow.AddSeconds(6)
+  do{
+    $running=$false
+    if($task){
       $stopped=Get-ScheduledTask -TaskName $info.TaskName -TaskPath $info.TaskPath -ErrorAction Stop
       Assert-WidgetSupervisorTaskIdentity $stopped $info
-      if([string]$stopped.State-ne 'Running'){return}
-      Start-Sleep -Milliseconds 150
-    }while([DateTime]::UtcNow-lt $deadline)
-    throw 'Supervisor task did not stop within 6 seconds.'
-  }
+      $running=[string]$stopped.State-eq 'Running'
+    }
+    foreach($process in $processes){
+      $current=Get-CimInstance Win32_Process -Filter ('ProcessId='+[int]$process.ProcessId) -ErrorAction Stop
+      if($current -and $current.CreationDate-eq $process.CreationDate){$running=$true}
+    }
+    if(!$running){return}
+    Start-Sleep -Milliseconds 150
+  }while([DateTime]::UtcNow-lt $deadline)
+  throw 'Supervisor did not stop within 6 seconds.'
 }
 
 function Unregister-WidgetSupervisorTask {

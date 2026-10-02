@@ -1,14 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {readUsage,atomicJson} from './usage.mjs';
+import {atomicJson} from './usage.mjs';
+import {requestRefresh} from './refresh-client.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const config=JSON.parse(fs.readFileSync(path.join(root,'installation.json'),'utf8').replace(/^\uFEFF/,''));
+const configPath=path.join(root,'installation.json');
+const config=JSON.parse(fs.readFileSync(configPath,'utf8').replace(/^\uFEFF/,''));
 const command=process.argv[2]??'status';
 if(command==='query'){
-  const result=await readUsage(config.codexPath);
-  atomicJson(path.join(config.dataDir,'status.json'),result);
-  console.log(JSON.stringify(result));process.exitCode=result.ok?0:1;
+  const result=await requestRefresh(config,configPath);
+  console.log(JSON.stringify(result));process.exitCode=result.queryOk && result.ok?0:1;
 }else if(command==='show' || command==='quote' || command==='menu' || command==='close-menu'){
   atomicJson(path.join(config.dataDir,'display-request.json'),{mode:command==='show'?'quota':command,at:Date.now(),nonce:crypto.randomUUID()});
   console.log('已请求显示'+(command==='show'?'额度':command==='quote'?'语录':'设置'));

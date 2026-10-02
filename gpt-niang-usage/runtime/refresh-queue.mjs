@@ -23,8 +23,9 @@ export function createRefreshQueue(run,{now=Date.now,onError=()=>{}}={}) {
 }
 
 export function mergeUsageSnapshot(previous,next,now=Date.now()) {
-  if(!next.ok && !next.clearPrevious && previous?.ok) {
-    return {...previous,error:next.error,checkedAt:now};
+  if(next.queryOk && previous?.ok && next.accountKey && next.accountKey===previous.accountKey && next.observedAt<previous.observedAt)return previous;
+  if(!next.ok && !next.clearPrevious && previous?.ok && next.accountKey && next.accountKey===previous.accountKey) {
+    return {...previous,queryOk:false,error:next.error,checkedAt:now};
   }
   return {...next,checkedAt:now};
 }

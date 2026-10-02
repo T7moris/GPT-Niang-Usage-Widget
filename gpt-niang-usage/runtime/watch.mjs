@@ -2,26 +2,67 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {readUsage,atomicJson} from './usage.mjs';
 import {createRefreshQueue,mergeUsageSnapshot,readRefreshRequest} from './refresh-queue.mjs';
-const config=JSON.parse(fs.readFileSync(process.argv[2],'utf8').replace(/^\uFEFF/,''));
+import {acquireWorkerLock,processAlive,readJson} from './worker-state.mjs';
+import {readPendingRequests,completeRequests,cleanRefreshResults} from './refresh-client.mjs';
+
+const config=readJson(process.argv[2]);
+if(!config?.dataDir || !config?.codexPath)throw new Error('Invalid widget installation configuration');
+const parentPid=Number(process.argv[3]??0);
+if(!Number.isSafeInteger(parentPid) || parentPid<0)throw new Error('Invalid parent process id');
+const lock=await acquireWorkerLock(config.dataDir,parentPid);
+if(!lock)process.exit(0);
 const statusFile=path.join(config.dataDir,'status.json');
-let status=null,requestToken=null;
-try{status=JSON.parse(fs.readFileSync(statusFile,'utf8'));}catch{}
+const healthFile=path.join(config.dataDir,'worker-status.json');
+let status=null,requestToken=readRefreshRequest(path.join(config.dataDir,'refresh.flag')),lastActivity=Date.now(),heartbeat;
+const activeRequestIds=new Set();
+const initialStop=readRefreshRequest(path.join(config.dataDir,'stop.flag'));
+const save=data=>{atomicJson(statusFile,data);status=data;};
+const health=()=>atomicJson(healthFile,{...lock.owner,at:Date.now(),busy:refresh.busy,lastRefresh:refresh.lastRefresh});
+function exit() {
+  clearInterval(heartbeat);
+  try{if(readJson(healthFile)?.token===lock.owner.token)fs.unlinkSync(healthFile);}catch{}
+  try{lock.release();}catch{}
+}
+process.on('exit',exit);
+process.on('SIGTERM',()=>process.exit(0));
+process.on('SIGINT',()=>process.exit(0));
+if(parentPid && !processAlive(parentPid))process.exit(0);
 const refresh=createRefreshQueue(async()=>{
-  const next=await readUsage(config.codexPath);
-  status=mergeUsageSnapshot(status,next);
-  atomicJson(statusFile,status);
+  lastActivity=Date.now();
+  const batch=readPendingRequests(config.dataDir);
+  for(const request of batch)activeRequestIds.add(request.id);
+  try {
+    const next=await readUsage(config.codexPath,{onAccount:accountKey=>{
+      if(status?.accountKey!==accountKey || !accountKey)save({ok:false,queryOk:false,accountKey,error:'正在读取当前账户额度…',windows:[],checkedAt:Date.now()});
+    }});
+    save(mergeUsageSnapshot(status,next));
+    completeRequests(config.dataDir,batch,status);
+    lastActivity=Date.now();
+  } finally {activeRequestIds.clear();}
 },{onError:error=>{
   // A temporary filesystem failure must not stop the quota worker.
   const code=typeof error?.code==='string'?error.code:'IO';
   console.error('Quota snapshot could not be saved; next refresh will retry ('+code+').');
 }});
-const heartbeat=setInterval(()=>{
-  if(fs.existsSync(path.join(config.dataDir,'stop.flag'))){clearInterval(heartbeat);process.exit(0);}
+
+// Persisted snapshots have not yet been matched to the current login.
+save({ok:false,queryOk:false,error:'正在读取当前账户额度…',windows:[],checkedAt:Date.now()});
+health();
+if(parentPid)void refresh.request();
+heartbeat=setInterval(()=>{
+  const stop=readRefreshRequest(path.join(config.dataDir,'stop.flag'));
+  if((parentPid && (!processAlive(parentPid) || stop!==null)) || (stop!==null && stop!==initialStop))process.exit(0);
   // No background queries while Codex is not visible; a fresh query on return.
-  let active=false;try{const p=JSON.parse(fs.readFileSync(path.join(config.dataDir,'presence.json'),'utf8').replace(/^\uFEFF/,''));active=p.visible && Date.now()-p.at<5000;}catch{}
+  const now=Date.now(),presence=readJson(path.join(config.dataDir,'presence.json'));
+  const active=presence?.visible && now-presence.at>=0 && now-presence.at<5000 && processAlive(presence.pid);
+  if(active)lastActivity=now;
   const request=readRefreshRequest(path.join(config.dataDir,'refresh.flag'));
-  if(request!==null && request!==requestToken){requestToken=request;void refresh.request();}
-  else if(active && !refresh.busy && Date.now()-refresh.lastRefresh>=60000)void refresh.request();
+  const requested=request!==null && request!==requestToken;
+  if(requested)requestToken=request;
+  const pending=readPendingRequests(config.dataDir,now);
+  if(requested)void refresh.request();
+  else if(pending.some(request=>!activeRequestIds.has(request.id)) || (active && !refresh.busy && now-refresh.lastRefresh>=60000))void refresh.request();
+  if(!parentPid && !active && !refresh.busy && pending.length===0 && now-lastActivity>=30000)process.exit(0);
+  cleanRefreshResults(config.dataDir,now);
+  try{health();}catch{}
 },1000);
-process.on('SIGTERM',()=>process.exit(0));
-process.on('SIGINT',()=>process.exit(0));
