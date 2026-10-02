@@ -1,6 +1,6 @@
-﻿param([switch]$CheckOnly,[switch]$Preview)
+param([switch]$CheckOnly,[switch]$Preview,[string]$AppDir=$PSScriptRoot)
 $ErrorActionPreference='Stop'
-$script:appDir=$PSScriptRoot
+$script:appDir=$AppDir
 $script:configPath=Join-Path $script:appDir 'installation.json'
 if(!(Test-Path -LiteralPath $script:configPath)){throw 'Please run Install.ps1 first.'}
 $script:config=Get-Content -LiteralPath $script:configPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -52,9 +52,9 @@ public static class GptWidgetNative {
     var title=new StringBuilder(256);GetWindowText(h,title,256);if(title.Length==0)return false;
     var cls=new StringBuilder(128);GetClassName(h,cls,128);if(cls.ToString()!="Chrome_WidgetWin_1")return false;
     uint pid;GetWindowThreadProcessId(h,out pid);
-    try{var p=Process.GetProcessById((int)pid);var name=p.ProcessName;
+    try{using(var p=Process.GetProcessById((int)pid)){var name=p.ProcessName;
       return name.Equals("Codex",StringComparison.OrdinalIgnoreCase)||name.Equals("ChatGPT",StringComparison.OrdinalIgnoreCase);
-    }catch{return false;}
+    }}catch{return false;}
   }
   public static IntPtr FindCodex(){
     var f=GetAncestor(GetForegroundWindow(),2);if(IsCodex(f))return f;
@@ -85,7 +85,7 @@ public sealed class GptBezierEase:EasingFunctionBase {
 try{[GptWidgetNative]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null}catch{}
 $script:window=[Windows.Markup.XamlReader]::Parse((Get-Content -LiteralPath (Join-Path $script:appDir 'widget.xaml') -Raw -Encoding UTF8))
 $script:ui=@{}
-foreach($name in @('Root','Bubble','Tail','TailNear','SceneText','QuotaText','QuoteText','BubbleShape','Girl','PressScale','FacingScale','TextFacingScale','Header','Refresh','MenuButton','Status','LiveDot','ShortUsed','ShortLeft','ShortReset','ShortBar','WeekUsed','WeekLeft','WeekReset','WeekBar')){$script:ui[$name]=$script:window.FindName($name)}
+foreach($name in @('Root','Bubble','Tail','TailNear','SceneText','QuotaText','QuoteText','BubbleShape','Girl','PressScale','FacingScale','TextFacingScale','Header','Refresh','MenuButton','Status','LiveDot','ShortRow','WeekRow','ShortUsed','ShortLeft','ShortReset','ShortBar','WeekUsed','WeekLeft','WeekReset','WeekBar')){$script:ui[$name]=$script:window.FindName($name)}
 $bitmap=New-Object Windows.Media.Imaging.BitmapImage
 $bitmap.BeginInit();$bitmap.CacheOption=[Windows.Media.Imaging.BitmapCacheOption]::OnLoad
 $bitmap.UriSource=[Uri](Join-Path $script:appDir 'assets\gpt-dragon-niang-bust.png');$bitmap.EndInit();$bitmap.Freeze()
@@ -192,7 +192,10 @@ function Apply-Scene {
 }
 function Update-BubbleTooltip {
   $copy=if($script:bubbleMode-eq 'quote'){$script:ui.QuoteText.Tag}else{
-    "5 小时：$($script:ui.ShortUsed.Text)，$($script:ui.ShortReset.Text)`n每周：$($script:ui.WeekUsed.Text)，$($script:ui.WeekReset.Text)`n$($script:ui.Status.Text)"
+    $parts=@()
+    if($script:ui.ShortRow.Visibility-ne [Windows.Visibility]::Collapsed){$parts+="5 小时：$($script:ui.ShortUsed.Text)，$($script:ui.ShortReset.Text)"}
+    if($script:ui.WeekRow.Visibility-ne [Windows.Visibility]::Collapsed){$parts+="每周：$($script:ui.WeekUsed.Text)，$($script:ui.WeekReset.Text)"}
+    ($parts+@($script:ui.Status.Text))-join "`n"
   }
   if(!$script:bubbleTooltipText){
     $script:bubbleTooltipText=New-Object Windows.Controls.TextBlock
@@ -334,24 +337,33 @@ function Reset-Label($seconds){
 function Update-Quota {
   $file=Join-Path $script:dataDir 'status.json'
   try{$stamp=[IO.File]::GetLastWriteTimeUtc($file).Ticks
-    if($stamp-ne $script:statusStamp){$script:status=Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json;$script:statusStamp=$stamp}
+    if(!(Test-Path -LiteralPath $file)){$script:status=$null;$script:statusStamp=0}
+    elseif($stamp-ne $script:statusStamp){$script:status=Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json;$script:statusStamp=$stamp}
   }catch{}
   $now=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
   foreach($row in @(@{prefix='Short';minutes=300},@{prefix='Week';minutes=10080})){
     $prefix=$row.prefix;$q=@($script:status.windows|Where-Object{$_.minutes-eq $row.minutes})|Select-Object -First 1
-    if(!$q){$script:ui[$prefix+'Used'].Text='已用 —';$script:ui[$prefix+'Left'].Text='—';$script:ui[$prefix+'Reset'].Text='暂无额度数据';$script:ui[$prefix+'Bar'].Width=0;continue}
-    $expired=[double]$q.resetsAt-le $now
+    $script:ui[$prefix+'Row'].Visibility=if(!$q -and $script:status.queryOk-eq $true){[Windows.Visibility]::Collapsed}else{[Windows.Visibility]::Visible}
+    $script:ui[$prefix+'Reset'].ToolTip=$null
+    if(!$q){
+      $script:ui[$prefix+'Used'].Text='已用 —';$script:ui[$prefix+'Left'].Text='—'
+      $script:ui[$prefix+'Reset'].Text=if($script:status -and $script:status.queryOk-ne $true){'额度读取异常'}else{'暂无额度数据'}
+      $script:ui[$prefix+'Bar'].Width=0;$script:ui[$prefix+'Left'].Foreground=[Windows.Media.BrushConverter]::new().ConvertFromString('#95889F');continue
+    }
+    $hasReset=$null-ne $q.resetsAt -and [double]$q.resetsAt-gt 0
+    $expired=$hasReset -and [double]$q.resetsAt-le $now
     $used=([double]$q.used).ToString('0.#');$left=([double]$q.remaining).ToString('0.#')
     $script:ui[$prefix+'Used'].Text=if($expired){"上次 $used%"}else{"已用 $used%"}
     $script:ui[$prefix+'Left'].Text=if($expired){'—'}else{"$left%"}
-    $script:ui[$prefix+'Reset'].Text=Reset-Label ([double]$q.resetsAt-$now)
-    $script:ui[$prefix+'Reset'].ToolTip='北京时间 '+[DateTimeOffset]::FromUnixTimeSeconds([long]$q.resetsAt).ToOffset([TimeSpan]::FromHours(8)).ToString('MM-dd HH:mm')+' 重置'
+    $script:ui[$prefix+'Reset'].Text=if($hasReset){Reset-Label ([double]$q.resetsAt-$now)}else{'未提供重置时间'}
+    if($hasReset){$script:ui[$prefix+'Reset'].ToolTip='北京时间 '+[DateTimeOffset]::FromUnixTimeSeconds([long]$q.resetsAt).ToOffset([TimeSpan]::FromHours(8)).ToString('MM-dd HH:mm')+' 重置'}
     $script:ui[$prefix+'Bar'].Width=if($expired){0}else{184*[double]$q.remaining/100}
     $color=if($expired){'#B3A7C0'}elseif([double]$q.used-ge 90){'#D77659'}elseif([double]$q.used-ge 75){'#D0A051'}else{'#9B86C1'}
     $script:ui[$prefix+'Bar'].Background=[Windows.Media.BrushConverter]::new().ConvertFromString($color)
     $valueColor=if($expired){'#95889F'}elseif([double]$q.used-ge 90){'#B74839'}elseif([double]$q.used-ge 75){'#A06C1C'}else{'#745A98'}
     $script:ui[$prefix+'Left'].Foreground=[Windows.Media.BrushConverter]::new().ConvertFromString($valueColor)
   }
+  $script:ui.WeekRow.Margin=if($script:ui.ShortRow.Visibility-eq [Windows.Visibility]::Collapsed){[Windows.Thickness]::new(0,3,0,0)}else{[Windows.Thickness]::new(0,8,0,0)}
   $age=if($script:status.observedAt){$now-[Math]::Floor([double]$script:status.observedAt/1000)}else{0}
   $dot='#9B86C1'
   if(!$script:status){$script:ui.Status.Text='正在读取订阅额度…';$dot='#C5A96F'}
@@ -379,11 +391,13 @@ if($Preview){
   $stream=[IO.File]::Create((Join-Path $script:appDir 'preview.png'));try{$encoder.Save($stream)}finally{$stream.Dispose()};return
 }
 $mutexKey='Local\GPTNiangUsage_'+([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($script:appDir))).Replace('/','_').Replace('+','-')
-$created=$false;$script:mutex=[Threading.Mutex]::new($true,$mutexKey,[ref]$created)
-if(!$created){Request-Refresh;$script:mutex.Dispose();return}
+$script:mutex=[Threading.Mutex]::new($false,$mutexKey);$script:mutexOwned=$false
+try{$script:mutexOwned=$script:mutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$script:mutexOwned=$true}
+if(!$script:mutexOwned){Request-Refresh;$script:mutex.Dispose();return}
 Initialize-WidgetAudio -AppDir $script:appDir
 Remove-Item -LiteralPath (Join-Path $script:dataDir 'stop.flag') -ErrorAction SilentlyContinue
 $script:worker=$null
+$script:lastWorkerProbe=0;$script:lastWorkerStart=0;$script:runtimeClosed=$false
 $script:hostHandle=[GptWidgetNative]::FindCodex();$script:lastPresence=0;$script:lastHostProbe=0;$script:drag=$null
 $script:lastForeground=[IntPtr](-1);$script:foregroundHost=[IntPtr]::Zero;$script:foregroundOwn=$false
 $script:lastPosition=$null;$script:attachedHost=[IntPtr]::Zero;$script:updating=$false
@@ -455,13 +469,57 @@ $script:ui.Girl.Add_MouseLeftButtonDown($pressDown);$script:ui.Girl.Add_MouseMov
 $script:ui.Girl.Add_LostMouseCapture({
   if($script:drag){$script:drag=$null;Animate-Press $false;Stop-WidgetAudio;Save-Settings}
 })
+function Ensure-QuotaWorker([long]$now){
+  if($now-$script:lastWorkerProbe-lt 5000){return}
+  $script:lastWorkerProbe=$now
+  $healthy=$false
+  try{
+    $health=Get-Content -LiteralPath (Join-Path $script:dataDir 'worker-status.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    $owner=Get-Content -LiteralPath (Join-Path $script:dataDir 'worker.lock') -Raw -Encoding UTF8 | ConvertFrom-Json
+    if($health.token -and $health.token-eq $owner.token -and $health.pid-eq $owner.pid -and $now-[long]$health.at-ge 0 -and $now-[long]$health.at-lt 5000){
+      $workerProcess=Get-Process -Id ([int]$health.pid) -ErrorAction Stop
+      try{$healthy=$workerProcess.Path-eq $script:config.nodePath -and $workerProcess.StartTime.ToUniversalTime()-le [DateTimeOffset]::FromUnixTimeMilliseconds([long]$health.startedAt).UtcDateTime}
+      finally{$workerProcess.Dispose()}
+      if($healthy -and $health.parentPid){$parentProcess=Get-Process -Id ([int]$health.parentPid) -ErrorAction Stop;$parentProcess.Dispose()}
+    }
+  }catch{$healthy=$false}
+  if($healthy){return}
+  if($script:worker){
+    try{
+      if(!$script:worker.HasExited){
+        if($now-$script:lastWorkerStart-lt 10000){return}
+        $script:worker.Kill()
+        if(!$script:worker.WaitForExit(1000)){return}
+      }
+    }catch{}
+    $script:worker.Dispose();$script:worker=$null
+  }
+  if($now-$script:lastWorkerStart-lt 5000){return}
+  $script:lastWorkerStart=$now
+  $workerArgs=@(('"'+(Join-Path $script:appDir 'runtime\watch.mjs')+'"'),('"'+$script:configPath+'"'),[string]$PID)
+  try{$script:worker=Start-Process -FilePath $script:config.nodePath -ArgumentList $workerArgs -WindowStyle Hidden -PassThru}
+  catch{[IO.File]::WriteAllText((Join-Path $script:dataDir 'worker-error.txt'),$_.Exception.Message,[Text.UTF8Encoding]::new($false))}
+}
+function Stop-WidgetRuntime {
+  if($script:runtimeClosed){return};$script:runtimeClosed=$true
+  foreach($timer in @($script:timer,$script:hostEventTimer,$script:menuTimer,$script:sceneTimer,$script:closeTimer)){try{if($timer){$timer.Stop()}}catch{}}
+  try{Stop-WidgetAudio}catch{}
+  foreach($hook in $script:eventHooks){try{if($hook-ne [IntPtr]::Zero){[GptWidgetNative]::UnhookWinEvent($hook)|Out-Null}}catch{}}
+  if($script:worker){try{if(!$script:worker.HasExited){$script:worker.Kill()}}catch{}; $script:worker.Dispose();$script:worker=$null}
+  foreach($name in @('runtime.json','presence.json')){
+    $file=Join-Path $script:dataDir $name
+    try{$state=Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json;if($state.pid-eq $PID){Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue}}catch{}
+  }
+  try{if($script:mutexOwned){$script:mutex.ReleaseMutex();$script:mutexOwned=$false}}catch{};try{$script:mutex.Dispose()}catch{}
+}
 function Tick-Widget {
   if($script:updating){return}
   $script:updating=$true
   try{
   $now=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   Tick-Scene $now
-  if($now-$script:lastPresence-gt 1000 -and (Test-Path -LiteralPath (Join-Path $script:dataDir 'stop.flag'))){$script:window.Close();return}
+  if($now-$script:lastPresence-ge 1000 -and (Test-Path -LiteralPath (Join-Path $script:dataDir 'stop.flag'))){$script:window.Close();return}
+  Ensure-QuotaWorker $now
   $foreground=[GptWidgetNative]::GetAncestor([GptWidgetNative]::GetForegroundWindow(),2)
   if($foreground-ne $script:lastForeground -or ($script:hostHandle-ne [IntPtr]::Zero -and ![GptWidgetNative]::IsWindow($script:hostHandle))){
     $script:lastForeground=$foreground
@@ -504,7 +562,7 @@ function Tick-Widget {
     [GptWidgetNative]::SetWindowPos($script:widgetHandle,[IntPtr](-2),0,0,0,0,0x13)|Out-Null
     $script:window.Hide()
   }
-  if($now-$script:lastPresence-gt 1000){
+  if($now-$script:lastPresence-ge 1000){
     Write-WidgetJson (Join-Path $script:dataDir 'presence.json') @{visible=[bool]$visible;at=$now;host=$script:hostHandle.ToInt64();widget=$script:widgetHandle.ToInt64();pid=$PID}
     Update-Quota;$script:lastPresence=$now
     Read-DisplayRequest
@@ -512,37 +570,36 @@ function Tick-Widget {
   }finally{$script:updating=$false}
 }
 $script:winEventCallback=[GptWidgetNative+WinEventProc]{param($hook,$ev,$hwnd,$objectId,$childId,$threadId,$time)
-  if($ev-eq 3 -or ($hwnd-eq $script:hostHandle -and $objectId-eq 0 -and $childId-eq 0)){
-    try{Tick-Widget}catch{[IO.File]::WriteAllText((Join-Path $script:dataDir 'display-error.txt'),$_.Exception.ToString())}
+  if($ev-eq 3 -or ($objectId-eq 0 -and $childId-eq 0 -and ($hwnd-eq $script:hostHandle -or ($script:hostHandle-eq [IntPtr]::Zero -and [GptWidgetNative]::IsCodex($hwnd))))){
+    # Coalesce native event bursts; expensive window reads only run once per frame.
+    if(!$script:hostEventTimer.IsEnabled){$script:hostEventTimer.Start()}
   }
 }
+$script:hostEventTimer=New-Object Windows.Threading.DispatcherTimer
+$script:hostEventTimer.Interval=[TimeSpan]::FromMilliseconds(33)
+$script:hostEventTimer.Add_Tick({$script:hostEventTimer.Stop();try{Tick-Widget}catch{[IO.File]::WriteAllText((Join-Path $script:dataDir 'display-error.txt'),$_.Exception.Message,[Text.UTF8Encoding]::new($false))}})
 $script:eventHooks=@(
   [GptWidgetNative]::Hook(3,3,$script:winEventCallback),
   [GptWidgetNative]::Hook(16,17,$script:winEventCallback),
+  [GptWidgetNative]::Hook(0x8000,0x8003,$script:winEventCallback),
   [GptWidgetNative]::Hook(0x800B,0x800B,$script:winEventCallback)
 )
 $script:timer=New-Object Windows.Threading.DispatcherTimer
-$script:timer.Interval=[TimeSpan]::FromMilliseconds(33)
+$script:timer.Interval=[TimeSpan]::FromMilliseconds(1000)
 $script:timer.Add_Tick({try{Tick-Widget}catch{[IO.File]::WriteAllText((Join-Path $script:dataDir 'display-error.txt'),$_.Exception.Message)}})
 $script:window.Add_Closed({
-  $script:timer.Stop();$script:menuTimer.Stop()
-  if($script:sceneTimer){$script:sceneTimer.Stop()}
-  if($script:closeTimer){$script:closeTimer.Stop()}
-  Stop-WidgetAudio
-  foreach($hook in $script:eventHooks){if($hook-ne [IntPtr]::Zero){[GptWidgetNative]::UnhookWinEvent($hook)|Out-Null}}
-  [IO.File]::WriteAllText((Join-Path $script:dataDir 'stop.flag'),'stop')
-  if($script:worker -and !$script:worker.HasExited){$script:worker.Kill()}
-  try{$script:mutex.ReleaseMutex()}catch{};$script:mutex.Dispose()
+  Stop-WidgetRuntime
   [Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown()
 })
 try{
   Save-Settings
-  $workerArgs=@(('"'+(Join-Path $script:appDir 'runtime\watch.mjs')+'"'),('"'+$script:configPath+'"'))
-  $script:worker=Start-Process -FilePath $script:config.nodePath -ArgumentList $workerArgs -WindowStyle Hidden -PassThru
-  Write-WidgetJson (Join-Path $script:dataDir 'runtime.json') @{pid=$PID;workerPid=$script:worker.Id;widget=$script:widgetHandle.ToInt64();startedAt=[DateTime]::UtcNow.ToString('o');eventHooks=@($script:eventHooks|ForEach-Object{$_.ToInt64()});fallbackIntervalMs=33}
+  Ensure-QuotaWorker ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+  $widgetProcess=Get-Process -Id $PID
+  try{$processStartedAt=$widgetProcess.StartTime.ToUniversalTime().ToString('o')}finally{$widgetProcess.Dispose()}
+  Write-WidgetJson (Join-Path $script:dataDir 'runtime.json') @{pid=$PID;widget=$script:widgetHandle.ToInt64();startedAt=[DateTime]::UtcNow.ToString('o');processStartedAt=$processStartedAt;eventHooks=@($script:eventHooks|ForEach-Object{$_.ToInt64()});fallbackIntervalMs=1000}
   $script:timer.Start();Tick-Widget
   [Windows.Threading.Dispatcher]::Run()
 }catch{
   [IO.File]::WriteAllText((Join-Path $script:dataDir 'display-error.txt'),$_.Exception.ToString())
   throw
-}
+}finally{Stop-WidgetRuntime}
