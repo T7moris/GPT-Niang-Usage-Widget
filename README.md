@@ -2,7 +2,7 @@
 
 让一只白发紫瞳的小龙娘，陪你看 Codex 的剩余额度。
 
-**Windows 桌面挂件 · 5 小时 / 每周额度 · 中文语录 · 当前版本 1.2.3**
+**Windows 桌面挂件 · 5 小时 / 每周额度 · 中文语录 · 当前版本 1.2.4**
 
 [**下载最新版**](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest) · [安装方法](#安装) · [更新记录](更新记录.md) · [反馈问题](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new)
 
@@ -23,7 +23,7 @@
 
 需要 **Windows 10 / 11、Node.js 20 或更新版本，以及已安装并用 ChatGPT 订阅登录的 Codex 桌面端**。
 
-1. 打开 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest)，在 **Assets** 中下载 **`gpt-niang-usage-widget-v1.2.3-windows.zip`**。也可以使用 **Code → Download ZIP** 获取当前源码。
+1. 打开 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest)，在 **Assets** 中下载 **`gpt-niang-usage-widget-v1.2.4-windows.zip`**。也可以使用 **Code → Download ZIP** 获取当前源码。
 2. 将压缩包**完整解压**到准备长期保留的位置；保留 `.agents` 与 `gpt-niang-usage` 文件夹。
 3. 双击根目录的 **`安装GPT娘.cmd`**，等待安装完成。
 4. 打开 Codex 主窗口，龙娘会自动出现。额度查询工具可在新建的聊天中使用。
@@ -34,16 +34,12 @@
 
 ### 安装包校验（建议）
 
-本版 `gpt-niang-usage-widget-v1.2.3-windows.zip` 的 SHA256：
-
-```
-321F838F631FADA7AEC18DD2EB74158A02D47FE276795AED72E3B07562DD9A90
-```
+本版 `gpt-niang-usage-widget-v1.2.4-windows.zip` 的 SHA256 见同一 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/tag/v1.2.4) 的 **`SHA256SUMS.txt`**。下载压缩包和校验文件后，确认计算出的哈希与文件中对应的一行一致。
 
 在 PowerShell 中核对：
 
 ```powershell
-Get-FileHash .\gpt-niang-usage-widget-v1.2.3-windows.zip -Algorithm SHA256
+Get-FileHash .\gpt-niang-usage-widget-v1.2.4-windows.zip -Algorithm SHA256
 ```
 
 哈希不一致说明文件在传输或转载中被替换，请不要安装。请只从本仓库的 Release 页面下载；第三方加速镜像只用于加速，不能当作可信来源。
@@ -59,7 +55,7 @@ Get-FileHash .\gpt-niang-usage-widget-v1.2.3-windows.zip -Algorithm SHA256
 
 前置条件：Windows 10 / 11、Node.js 20 或更新版本、已安装并用 ChatGPT 订阅登录的 Codex 桌面端。安装器注册的是**本地路径**插件市场，因此**不需要管理员权限，也不需要 git**。
 
-这段提示会让 AI 下载并执行安装脚本。请要求它先核对上面的 SHA256、确认下载来源是本仓库的 Release 页面；不要让无法核对来源的自动化流程直接安装。
+这段提示会让 AI 下载并执行安装脚本。请要求它先核对 Release 中的 SHA256 校验文件、确认下载来源是本仓库的 Release 页面；不要让无法核对来源的自动化流程直接安装。
 
 ## 使用
 
@@ -113,7 +109,7 @@ Get-FileHash .\gpt-niang-usage-widget-v1.2.3-windows.zip -Algorithm SHA256
 
 **使用挂件会有封号风险吗？** 查询使用 [Codex 官方 App Server 文档](https://learn.chatgpt.com/docs/app-server) 中的 `account/read` 与 `account/rateLimits/read`，由本机 Codex 复用现有登录；这条查询链不创建聊天、不发起模型生成、不共享登录凭据，也不绕过额度限制。默认可见时每 60 秒查询一次，隐藏时暂停。但官方未对第三方额度挂件给出免封承诺；[使用条款](https://openai.com/policies/terms-of-use/) 对自动化提取数据、账号共享及绕过限制均有约束，成功读取不能证明永久合规或零风险。请保留默认查询频率，接口拒绝访问时不要改为绕过认证或限制。
 
-**杀毒软件或 SmartScreen 报警？** 安装包里没有 exe / dll，全部是 PowerShell、VBS 与 Node 脚本。由于安装链需要在受限策略下运行（`-ExecutionPolicy Bypass`）、以隐藏窗口常驻并注册登录任务，未签名的脚本包可能被启发式规则误报。请先按上面的 SHA256 核对来源，再决定是否放行；如果设备策略不允许运行脚本，请不要绕过策略。
+**杀毒软件或 SmartScreen 报警？** 安装包里没有 exe / dll，全部是 PowerShell、VBS 与 Node 脚本。由于安装链需要在受限策略下运行（`-ExecutionPolicy Bypass`）、以隐藏窗口常驻并注册登录任务，未签名的脚本包可能被启发式规则误报。请先按 Release 中的 SHA256 校验文件核对来源，再决定是否放行；如果设备策略不允许运行脚本，请不要绕过策略。
 
 **系统或企业策略阻止脚本？** 此版本依赖 Windows PowerShell / WPF、Windows Script Host 和当前用户计划任务。请遵循设备管理策略；项目不会修改系统安全策略。
 
