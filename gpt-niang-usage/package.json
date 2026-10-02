@@ -1,6 +1,6 @@
 {
   "name": "gpt-niang-usage",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "private": true,
   "type": "module",
   "description": "GPT娘额度挂件",
