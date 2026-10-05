@@ -14,3 +14,7 @@ dist/
 *.zip
 Thumbs.db
 .DS_Store
+
+**/preview.png
+**/.env
+**/.env.*

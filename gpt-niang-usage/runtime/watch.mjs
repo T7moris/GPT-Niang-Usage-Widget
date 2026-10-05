@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {readUsage,atomicJson} from './usage.mjs';
+import {readUsage,atomicJson,resolveCodexExecutable} from './usage.mjs';
 import {createRefreshQueue,mergeUsageSnapshot,readRefreshRequest} from './refresh-queue.mjs';
 import {acquireWorkerLock,processAlive,readJson} from './worker-state.mjs';
 import {readPendingRequests,completeRequests,cleanRefreshResults} from './refresh-client.mjs';
@@ -32,7 +32,7 @@ const refresh=createRefreshQueue(async()=>{
   const batch=readPendingRequests(config.dataDir);
   for(const request of batch)activeRequestIds.add(request.id);
   try {
-    const next=await readUsage(config.codexPath,{onAccount:accountKey=>{
+    const next=await readUsage(resolveCodexExecutable(config.codexPath),{onAccount:accountKey=>{
       if(status?.accountKey!==accountKey || !accountKey)save({ok:false,queryOk:false,accountKey,error:'正在读取当前账户额度…',windows:[],checkedAt:Date.now()});
     }});
     save(mergeUsageSnapshot(status,next));

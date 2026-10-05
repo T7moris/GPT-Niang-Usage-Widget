@@ -36,11 +36,36 @@ export function accountFingerprint(account) {
   return createHash('sha256').update(JSON.stringify([account.type,account.planType??null,identity])).digest('hex');
 }
 
+// The desktop app replaces its hash-named CLI folder during updates. Resolve
+// the executable on every refresh rather than pinning the install-time path.
+export function resolveCodexExecutable(configuredPath,{env=process.env,platform=process.platform}={}) {
+  const isFile=file=>{try{return fs.statSync(file).isFile();}catch{return false;}};
+  if(typeof configuredPath==='string' && isFile(configuredPath))return configuredPath;
+  const executable=platform==='win32'?'codex.exe':'codex';
+  const localData=env.LOCALAPPDATA??env.LocalAppData;
+  if(platform==='win32' && localData){
+    const root=path.join(localData,'OpenAI','Codex','bin');
+    const candidates=[];
+    const add=file=>{try{const stat=fs.statSync(file);if(stat.isFile())candidates.push({file,modified:stat.mtimeMs});}catch{}};
+    add(path.join(root,executable));
+    try{for(const entry of fs.readdirSync(root,{withFileTypes:true})){if(entry.isDirectory())add(path.join(root,entry.name,executable));}}catch{}
+    candidates.sort((a,b)=>b.modified-a.modified||a.file.localeCompare(b.file));
+    if(candidates.length)return candidates[0].file;
+  }
+  for(const directory of (env.PATH??env.Path??'').split(platform==='win32'?';':':')){
+    const trimmed=directory.trim().replace(/^"(.*)"$/,'$1');
+    if(!trimmed)continue;
+    const file=path.join(trimmed,executable);
+    if(isFile(file))return file;
+  }
+  return configuredPath;
+}
+
 // Only three read-only protocol methods are sent. There is no thread or model call.
 export function readUsage(cli, {timeoutMs=18000,spawnProcess=spawn,onAccount=()=>{}}={}) {
   return new Promise(resolve=>{
     let finished=false,proc,lines,accountKey=null,expectedId=1;
-    const failure=error=>({ok:false,queryOk:false,error,windows:[],accountKey,clearPrevious:!accountKey});
+    const failure=(error,errorCode)=>({ok:false,queryOk:false,error,windows:[],accountKey,clearPrevious:!accountKey,...(errorCode?{errorCode}:{})});
     const stopChild=()=>{try{proc?.stdin.end();proc?.kill();}catch{}};
     const finish=data=>{
       if(finished)return; finished=true; clearTimeout(timer);
@@ -54,7 +79,7 @@ export function readUsage(cli, {timeoutMs=18000,spawnProcess=spawn,onAccount=()=
     catch{finish(failure('Codex 额度服务暂不可用'));return;}
     process.once('exit',stopChild);
     proc.stderr.on('data',()=>{}).on('error',()=>{});
-    proc.on('error',()=>finish(failure('无法启动 Codex 额度服务')));
+    proc.on('error',error=>finish(failure(error.code==='ENOENT'?'未找到 Codex 程序，请检查客户端安装':'无法启动 Codex 额度服务',error.code)));
     proc.on('close',()=>finish(failure('Codex 额度服务已结束')));
     proc.stdout.on('error',()=>finish(failure('Codex 额度连接已结束')));
     proc.stdin.on('error',()=>finish(failure('Codex 额度连接已结束')));

@@ -24,49 +24,46 @@
     </Style>
   </Window.Resources>
   <Viewbox x:Name="ScaleHost" Stretch="Uniform">
-  <Canvas x:Name="Root" Width="350" Height="350" RenderTransformOrigin="0.5,1">
+  <Canvas x:Name="AnimationStage" Width="378" Height="378">
+  <Canvas x:Name="Root" Canvas.Left="14" Canvas.Top="14" Width="350" Height="350" RenderTransformOrigin="0.5,1">
     <Canvas.RenderTransform><TransformGroup><ScaleTransform x:Name="PressScale"/><ScaleTransform x:Name="FacingScale"/></TransformGroup></Canvas.RenderTransform>
     <Canvas x:Name="Bubble" Width="350" Height="239" Cursor="Hand" RenderTransformOrigin="0.4425,0.36">
       <Canvas.RenderTransform><ScaleTransform ScaleX="1" ScaleY="1"/></Canvas.RenderTransform>
       <Path x:Name="BubbleShape" Fill="#FFFFFF" Stroke="#745A98" StrokeThickness="4"
             StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
             Data="M 283,85 A 128,79 0 1 0 27,85 A 128,79 0 0 0 114,160 A 20,10 0 0 0 149,164 A 128,79 0 0 0 283,85 Z"/>
-      <Grid x:Name="SceneText" Canvas.Left="63" Canvas.Top="25" Width="184" Height="115" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
+      <Grid x:Name="SceneText" Canvas.Left="63" Canvas.Top="22" Width="184" Height="115" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
         <Grid.RenderTransform><ScaleTransform x:Name="TextFacingScale"/></Grid.RenderTransform>
       <StackPanel x:Name="QuotaText" VerticalAlignment="Center">
-        <TextBlock x:Name="Header" Text="剩余额度" HorizontalAlignment="Center" FontSize="14" FontWeight="SemiBold" Foreground="#745A98"/>
-        <StackPanel x:Name="ShortRow" Margin="0,3,0,0">
-        <Grid Height="30">
-          <TextBlock Text="5 小时" FontSize="14" VerticalAlignment="Center" Foreground="#76638D"/>
-          <TextBlock x:Name="ShortLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="28" FontWeight="Bold" Foreground="#745A98"/>
+        <TextBlock x:Name="Header" Text="剩余额度" HorizontalAlignment="Center" FontSize="12" LineHeight="16" LineStackingStrategy="BlockLineHeight" FontWeight="SemiBold" Foreground="#7D6B91" ToolTip="重置时间按当前机器的本地时间显示"/>
+        <StackPanel x:Name="ShortRow" Margin="0,1,0,0">
+        <Grid Height="25">
+          <TextBlock Text="5 小时" FontSize="13" VerticalAlignment="Center" Foreground="#76638D"/>
+          <TextBlock x:Name="ShortLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Segoe UI" FontSize="24" LineHeight="25" LineStackingStrategy="BlockLineHeight" FontWeight="Bold" Foreground="#745A98"/>
         </Grid>
-        <Border Height="6" Background="#EAE4F3" CornerRadius="3" Margin="0,3,0,0">
-          <Border x:Name="ShortBar" Background="#AA95CD" CornerRadius="3" Width="0" HorizontalAlignment="Left"/>
+        <Border Height="4" Background="#EAE4F3" CornerRadius="2" Margin="0,1,0,0">
+          <Border x:Name="ShortBar" Background="#AA95CD" CornerRadius="2" Width="0" HorizontalAlignment="Left"/>
         </Border>
-        <Grid Visibility="Collapsed">
-          <TextBlock x:Name="ShortReset" Text="等待额度数据" FontSize="8" Foreground="#B2A4C4"/>
-          <TextBlock x:Name="ShortUsed" Text="已用 —" HorizontalAlignment="Right" FontSize="8" Foreground="#B2A4C4"/>
-        </Grid>
+        <TextBlock x:Name="ShortReset" Text="等待额度数据" Margin="0,1,0,0" FontSize="12" LineHeight="15" LineStackingStrategy="BlockLineHeight" Foreground="#7D6B91"/>
+        <TextBlock x:Name="ShortUsed" Visibility="Collapsed" Text="已用 —"/>
         </StackPanel>
-        <StackPanel x:Name="WeekRow" Margin="0,8,0,0">
-        <Grid Height="30">
-          <TextBlock Text="每周" FontSize="14" VerticalAlignment="Center" Foreground="#76638D"/>
-          <TextBlock x:Name="WeekLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="28" FontWeight="Bold" Foreground="#745A98"/>
+        <StackPanel x:Name="WeekRow" Margin="0,4,0,0">
+        <Grid Height="25">
+          <TextBlock Text="每周" FontSize="13" VerticalAlignment="Center" Foreground="#76638D"/>
+          <TextBlock x:Name="WeekLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Segoe UI" FontSize="24" LineHeight="25" LineStackingStrategy="BlockLineHeight" FontWeight="Bold" Foreground="#745A98"/>
         </Grid>
-        <Border Height="6" Background="#EAE4F3" CornerRadius="3" Margin="0,3,0,0">
-          <Border x:Name="WeekBar" Background="#AA95CD" CornerRadius="3" Width="0" HorizontalAlignment="Left"/>
+        <Border Height="4" Background="#EAE4F3" CornerRadius="2" Margin="0,1,0,0">
+          <Border x:Name="WeekBar" Background="#AA95CD" CornerRadius="2" Width="0" HorizontalAlignment="Left"/>
         </Border>
-        <Grid Visibility="Collapsed">
-          <TextBlock x:Name="WeekReset" Text="等待额度数据" FontSize="8" Foreground="#B2A4C4"/>
-          <TextBlock x:Name="WeekUsed" Text="已用 —" HorizontalAlignment="Right" FontSize="8" Foreground="#B2A4C4"/>
-        </Grid>
+        <TextBlock x:Name="WeekReset" Text="等待额度数据" Margin="0,1,0,0" FontSize="12" LineHeight="15" LineStackingStrategy="BlockLineHeight" Foreground="#7D6B91"/>
+        <TextBlock x:Name="WeekUsed" Visibility="Collapsed" Text="已用 —"/>
         </StackPanel>
         <TextBlock x:Name="Status" Visibility="Collapsed" Text="正在读取额度…"/>
       </StackPanel>
-        <TextBlock x:Name="QuoteText" Visibility="Collapsed" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="20" FontWeight="Bold" LineHeight="25" Foreground="#745A98" Text="我在这儿，慢慢来就好。"/>
+        <TextBlock x:Name="QuoteText" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="20" FontWeight="Bold" LineHeight="25" Foreground="#745A98" Text="我在这儿，慢慢来就好。"/>
       </Grid>
-      <Ellipse x:Name="LiveDot" Canvas.Left="134" Canvas.Top="17" Width="4" Height="4" Fill="#9B86C1" IsHitTestVisible="False"/>
-      <Button x:Name="Refresh" Canvas.Left="237" Canvas.Top="24" Width="22" Height="22" Content="↻" FontSize="16" ToolTip="立即刷新额度"/>
+    <Ellipse x:Name="LiveDot" Visibility="Collapsed" Canvas.Left="134" Canvas.Top="17" Width="4" Height="4" Fill="#9B86C1" IsHitTestVisible="False"/>
+      <Button x:Name="Refresh" Canvas.Left="184" Canvas.Top="20" Width="20" Height="20" Content="↻" FontSize="14" ToolTip="立即刷新额度"/>
     </Canvas>
     <Ellipse x:Name="Tail" Canvas.Left="108" Canvas.Top="182" Width="25" Height="18" Fill="#FFFFFF" Stroke="#745A98" StrokeThickness="4" RenderTransformOrigin="0.5,0.5">
       <Ellipse.RenderTransform><ScaleTransform/></Ellipse.RenderTransform>
@@ -78,6 +75,7 @@
            ToolTip="点角色看额度；点气泡看语录，再点收起；拖动调整位置；右键设置"/>
     <Button x:Name="MenuButton" Canvas.Left="320" Canvas.Top="162" Width="24" Height="24" Content="☰"
             FontSize="15" Opacity="0" IsHitTestVisible="False" Background="#EDE7F6" ToolTip="挂件设置"/>
+  </Canvas>
   </Canvas>
   </Viewbox>
 </Window>

@@ -58,6 +58,13 @@ try{
     Remove-Item -LiteralPath $workerFile
     Assert-Throws {& (Join-Path $moved 'Install.ps1') -CheckOnly} '*Missing file: runtime\worker-state.mjs' 'missing worker dependencies are rejected before registration'
   }finally{[IO.File]::WriteAllBytes($workerFile,$workerBytes)}
+  $colorFile=Join-Path $moved 'runtime\color-theme.ps1'
+  $colorBytes=[IO.File]::ReadAllBytes($colorFile)
+  try{
+    Remove-Item -LiteralPath $colorFile
+    Assert-Throws {& (Join-Path $moved 'Install.ps1') -CheckOnly} '*Missing file: runtime\color-theme.ps1' 'missing color module is rejected before registration'
+    Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes($configFile))-eq $initialConfigBytes) 'missing color module rejection preserves config'
+  }finally{[IO.File]::WriteAllBytes($colorFile,$colorBytes)}
   $info=Get-WidgetSupervisorInfo $moved @{appDir=$moved;dataDir=$data}
   $global:widgetInstallerTestTasks=@([pscustomobject]@{TaskName=$info.TaskName;TaskPath=$info.TaskPath;Principal=@{UserId=$info.Sid;LogonType='Interactive';RunLevel='Limited'};Actions=@(@{Execute=$info.Execute;Arguments='"'+(Join-Path $old 'supervisor.vbs')+'"';WorkingDirectory=$old})})
   Assert-Throws {& (Join-Path $moved 'Install.ps1') -CheckOnly} '*task action path mismatch*' 'foreign task is rejected during CheckOnly'

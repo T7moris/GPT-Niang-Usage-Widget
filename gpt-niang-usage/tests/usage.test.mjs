@@ -19,6 +19,13 @@ test('missing and invalid fields stay unavailable, valid zero and full usage sur
   assert.equal(normalizeLimits({rateLimits:{primary:w(0)}}).windows[0].remaining,100);
   assert.equal(normalizeLimits({rateLimits:{primary:w(100)}}).windows[0].remaining,0);
 });
+test('an exhausted window still reports zero remaining and keeps the other window',()=>{
+  for(const [short,week] of [[100,34],[20,100],[100,100]]){
+    const result=normalizeLimits({rateLimits:{primary:w(short),secondary:w(week,10080)}});
+    assert.equal(result.ok,true);assert.equal(result.queryOk,true);
+    assert.deepEqual(result.windows.map(window=>window.remaining),[100-short,100-week]);
+  }
+});
 test('passed reset stays expired instead of invented replenishment',()=>{
   assert.equal(freshness({resetsAt:2},1000,3000),'expired');
   assert.equal(freshness({resetsAt:1000},1000,200000),'stale');

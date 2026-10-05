@@ -12,6 +12,12 @@ import {acquireWorkerLock,readJson,healthyWorker} from '../runtime/worker-state.
 
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const worker=fileURLToPath(new URL('../runtime/watch.mjs',import.meta.url));
+// Missing-CLI fixtures must not discover the developer's installed Codex.
+function isolatedWorkerEnv(dir){
+  const env={...process.env};
+  for(const key of Object.keys(env))if(['localappdata','path'].includes(key.toLowerCase()))delete env[key];
+  return {...env,LOCALAPPDATA:dir,PATH:dir};
+}
 const mockCli=[
   "const fs=require('node:fs'),readline=require('node:readline');",
   "let account;const send=(id,result)=>process.stdout.write(JSON.stringify({id,result})+'\\n');",
@@ -92,7 +98,7 @@ test('two actual worker startups share one writer and recover an absent GUI for 
     atomicJson(configPath,config);
     atomicJson(path.join(dir,'status.json'),{ok:true,accountKey:'old-account',windows:[{remaining:99}]});
     const startWorker=()=>{
-      const child=spawn(process.execPath,[worker,configPath,'0'],{windowsHide:true,stdio:['ignore','ignore','pipe']});
+      const child=spawn(process.execPath,[worker,configPath,'0'],{env:isolatedWorkerEnv(dir),windowsHide:true,stdio:['ignore','ignore','pipe']});
       child.stderr.on('data',data=>{errors+=data;});children.push(child);
     };
     const options={startWorker,timeoutMs:6000,pollMs:20};
@@ -122,7 +128,7 @@ test('worker exits when its GUI parent exits and releases ownership',async()=>{
   try {
     const configPath=path.join(dir,'installation.json');
     atomicJson(configPath,{dataDir:dir,codexPath:path.join(dir,'missing-codex.exe')});
-    child=spawn(process.execPath,[worker,configPath,String(parent.pid)],{windowsHide:true,stdio:'ignore'});
+    child=spawn(process.execPath,[worker,configPath,String(parent.pid)],{env:isolatedWorkerEnv(dir),windowsHide:true,stdio:'ignore'});
     const deadline=Date.now()+4000;
     while(!healthyWorker(dir) && Date.now()<deadline)await pause(20);
     assert.ok(healthyWorker(dir));
@@ -144,7 +150,7 @@ test('Windows pipe ownership recovers after a force-killed worker leaves stale f
     const configPath=path.join(dir,'installation.json');
     atomicJson(configPath,{dataDir:dir,codexPath:path.join(dir,'missing-codex.exe')});
     const start=()=>{
-      const child=spawn(process.execPath,[worker,configPath,String(process.pid)],{windowsHide:true,stdio:'ignore'});
+      const child=spawn(process.execPath,[worker,configPath,String(process.pid)],{env:isolatedWorkerEnv(dir),windowsHide:true,stdio:'ignore'});
       children.push(child);return child;
     };
     const waitForOwner=async child=>{
