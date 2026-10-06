@@ -73,7 +73,8 @@ test('macOS falls back to the bundled signed CLI and honors a valid override',t=
   assert.equal(resolveCodexExecutable(custom,{platform:'darwin',env:{GPT_NIANG_CODEX_APP:app}}),custom);
 });
 
-test('macOS missing-app fixtures cannot discover a real desktop account',t=>{
+// This fixture uses a POSIX PATH; a Windows drive letter contains its delimiter.
+test('macOS missing-app fixtures cannot discover a real desktop account',{skip:process.platform==='win32'},t=>{
   const {root,write}=fixture(t);
   const cli=write('path-bin/codex');
   assert.equal(resolveCodexExecutable(undefined,{platform:'darwin',env:{GPT_NIANG_CODEX_APP:path.join(root,'absent.app'),PATH:path.dirname(cli)}}),cli);
