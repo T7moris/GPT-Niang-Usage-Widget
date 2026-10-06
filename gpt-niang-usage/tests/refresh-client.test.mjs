@@ -16,7 +16,7 @@ const worker=fileURLToPath(new URL('../runtime/watch.mjs',import.meta.url));
 function isolatedWorkerEnv(dir){
   const env={...process.env};
   for(const key of Object.keys(env))if(['localappdata','path'].includes(key.toLowerCase()))delete env[key];
-  return {...env,LOCALAPPDATA:dir,PATH:dir};
+  return {...env,LOCALAPPDATA:dir,PATH:dir,GPT_NIANG_CODEX_APP:path.join(dir,'absent.app')};
 }
 const mockCli=[
   "const fs=require('node:fs'),readline=require('node:readline');",
@@ -143,7 +143,7 @@ test('worker exits when its GUI parent exits and releases ownership',async()=>{
   }
 });
 
-test('Windows pipe ownership recovers after a force-killed worker leaves stale files',{skip:process.platform!=='win32'},async()=>{
+test('worker ownership recovers after a force-killed worker leaves stale files',{skip:!['win32','darwin'].includes(process.platform)},async()=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gpt-niang-crash-'));
   const children=[];
   try {
@@ -160,7 +160,7 @@ test('Windows pipe ownership recovers after a force-killed worker leaves stale f
       return readJson(path.join(dir,'worker.lock')).token;
     };
     const first=start(),firstToken=await waitForOwner(first);
-    const crashed=once(first,'exit');first.kill();await crashed;
+    const crashed=once(first,'exit');first.kill(process.platform==='darwin'?'SIGKILL':'SIGTERM');await crashed;
     assert.equal(healthyWorker(dir),null);
     const second=start(),secondToken=await waitForOwner(second);
     assert.notEqual(firstToken,secondToken);

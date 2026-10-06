@@ -42,6 +42,21 @@ export function resolveCodexExecutable(configuredPath,{env=process.env,platform=
   const isFile=file=>{try{return fs.statSync(file).isFile();}catch{return false;}};
   if(typeof configuredPath==='string' && isFile(configuredPath))return configuredPath;
   const executable=platform==='win32'?'codex.exe':'codex';
+  if(platform==='darwin'){
+    // Finder launches with a minimal PATH. Prefer the CLI shipped with the app.
+    // An explicit app root also lets tests isolate themselves from real logins.
+    const applications=env.GPT_NIANG_CODEX_APP?[env.GPT_NIANG_CODEX_APP]:[
+      '/Applications/Codex.app',
+      ...(env.HOME?[path.join(env.HOME,'Applications','Codex.app')]:[])
+    ];
+    for(const app of applications){
+      for(const relative of ['Contents/Resources/codex-cli/bin/codex','Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex','Contents/Resources/codex']){
+        const file=path.join(app,relative);
+        if(isFile(file))return file;
+      }
+    }
+  }
+
   const localData=env.LOCALAPPDATA??env.LocalAppData;
   if(platform==='win32' && localData){
     const root=path.join(localData,'OpenAI','Codex','bin');

@@ -9,7 +9,7 @@ const config=readJson(process.argv[2]);
 if(!config?.dataDir || !config?.codexPath)throw new Error('Invalid widget installation configuration');
 const parentPid=Number(process.argv[3]??0);
 if(!Number.isSafeInteger(parentPid) || parentPid<0)throw new Error('Invalid parent process id');
-const lock=await acquireWorkerLock(config.dataDir,parentPid);
+const lock=await acquireWorkerLock(config.dataDir,parentPid,{onLost:()=>process.exit(1)});
 if(!lock)process.exit(0);
 const statusFile=path.join(config.dataDir,'status.json');
 const healthFile=path.join(config.dataDir,'worker-status.json');
