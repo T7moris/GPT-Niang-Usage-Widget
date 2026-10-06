@@ -49,8 +49,23 @@ Stop-WidgetGui -AppDir $appDir -DataDir $dataDir
 if($LASTEXITCODE-ne 0){throw 'Codex rejected the local marketplace.'}
 & $codex plugin add 'gpt-niang-usage@gpt-niang-local' --json
 if($LASTEXITCODE-ne 0){throw 'Codex rejected the GPT Niang plugin.'}
-$catalog=(& $codex plugin list --json)|ConvertFrom-Json
-if($LASTEXITCODE-ne 0){throw 'Cannot verify plugin registration.'}
+# Decode the UTF-8 JSON directly, independent of the console code page.
+$processInfo=New-Object System.Diagnostics.ProcessStartInfo
+$processInfo.FileName=$codex
+$processInfo.Arguments='plugin list --json'
+$processInfo.UseShellExecute=$false
+$processInfo.RedirectStandardOutput=$true
+$processInfo.StandardOutputEncoding=[Text.UTF8Encoding]::new($false)
+$process=New-Object System.Diagnostics.Process
+$process.StartInfo=$processInfo
+try{
+  if(!$process.Start()){throw 'Cannot start Codex plugin list.'}
+  $catalogJson=$process.StandardOutput.ReadToEnd()
+  $process.WaitForExit()
+  $exitCode=$process.ExitCode
+}finally{$process.Dispose()}
+if($exitCode-ne 0){throw 'Cannot verify plugin registration.'}
+$catalog=$catalogJson|ConvertFrom-Json
 $match=@($catalog.installed|Where-Object{$_.pluginId-eq 'gpt-niang-usage@gpt-niang-local' -and $_.version-eq $manifest.version -and $_.installed -and $_.enabled})
 if($match.Count-ne 1){throw 'Codex did not report one enabled GPT Niang plugin.'}
 $shell=New-Object -ComObject WScript.Shell
