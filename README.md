@@ -19,6 +19,12 @@
 
 这是独立的 Windows 本地挂件及额度查询插件。它读取当前 Codex 登录账户的额度，**不会为读取额度创建聊天或调用模型**。它不是 OpenAI 或 DeepSeek 的官方项目。
 
+## macOS 原生版本
+
+本仓库新增 SwiftUI / AppKit 的 macOS companion，保留原角色、原版按压回弹、分段气泡、语录淡入、流光配色与音效。支持拖动吸附、双击／右键设置、菜单栏和可选登录启动，并提供独立的聊天速度面板。需要 macOS 13+、Node.js 20+ 和已登录的 Codex 桌面端。
+
+从源码运行 `./script/build_and_run.sh`，生成 `dist/GPTNiangMac.app`。完整安装、功能、速度指标解释和验证方式见 [macOS 使用说明](macos/README.md)。原有 Windows Release 安装包仍按下面的方法使用。
+
 ## 安装
 
 需要 **Windows 10 / 11、Node.js 20 或更新版本，以及已安装并用 ChatGPT 订阅登录的 Codex 桌面端**。
@@ -129,13 +135,13 @@ npm run test:windows
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\gpt-niang-usage\Install.ps1 -CheckOnly
 ```
 
-界面实现为 Windows PowerShell / WPF，额度查询和 MCP 服务使用 Node.js。窗口识别与接口依赖当前 Codex 桌面端实现，后续客户端更新可能需要适配。当前支持 Windows，未提供 macOS / Linux 版本。
+界面实现为 Windows PowerShell / WPF，额度查询和 MCP 服务使用 Node.js。窗口识别与接口依赖当前 Codex 桌面端实现，后续客户端更新可能需要适配。Windows 界面与 macOS 原生 companion 分别实现；未提供 Linux 版本。
 
 ## 反馈与参与
 
 遇到问题可以 [提交中文问题反馈](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new)。请说明 Windows / Codex / 挂件版本、复现步骤以及期望效果；截图请裁去对话、账号和其他私人信息。不要上传登录文件或整个状态目录。
 
-欢迎改进窗口兼容性、安装流程和可读性；改动后请运行上面的检查。这个版本的角色是静态半身配合按压动画；不包含完整桌宠动作或 macOS / Linux 支持。
+欢迎改进窗口兼容性、安装流程和可读性；改动后请运行上面的检查。这个版本的角色是静态半身配合按压动画；不包含完整桌宠动作；macOS companion 见上面的说明，尚无 Linux 支持。
 
 ## 致谢与许可
 
