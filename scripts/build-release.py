@@ -27,6 +27,8 @@ files = sorted(p for p in tracked if p and not p.startswith((".github/", "script
 required = {
     ".agents/plugins/marketplace.json", manifest_path,
     "安装GPT娘.cmd", "停用GPT娘.cmd", "打开GPT娘.cmd",
+    "检测套餐.cmd", "gpt-niang-usage/Detect-Plan.ps1",
+    "gpt-niang-usage/runtime/plan.mjs", "gpt-niang-usage/runtime/detect-plan.mjs",
     "gpt-niang-usage/runtime/start-widget.ps1",
     "gpt-niang-usage/runtime/refresh-client.mjs",
     "gpt-niang-usage/runtime/worker-state.mjs",
