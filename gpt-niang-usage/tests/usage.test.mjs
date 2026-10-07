@@ -14,8 +14,31 @@ test('prefer current codex bucket over legacy and unrelated model buckets',()=>{
 test('missing current bucket does not borrow a different account or meter',()=>{
   assert.equal(normalizeLimits({rateLimits:{primary:w()},rateLimitsByLimitId:{other:{primary:w()}}}).ok,false);
 });
+test('each window is classified by its own duration, not by the primary/secondary slot',()=>{
+  const monthlyInPrimary=normalizeLimits({rateLimits:{primary:w(0,43200),secondary:null}});
+  assert.deepEqual(monthlyInPrimary.windows.map(x=>[x.label,x.minutes,x.remaining]),[['每月',43200,100]]);
+  const swapped=normalizeLimits({rateLimits:{primary:w(10,10080),secondary:w(20,300)}});
+  assert.deepEqual(swapped.windows.map(x=>[x.label,x.minutes,x.remaining]),[['5 小时',300,80],['每周',10080,90]]);
+  const calendarMonth=normalizeLimits({rateLimits:{primary:w(5,10080),secondary:w(7,43800)}});
+  assert.deepEqual(calendarMonth.windows.map(x=>[x.label,x.minutes,x.remaining]),[['每周',10080,95],['每月',43800,93]]);
+  assert.equal(normalizeLimits({rateLimits:{primary:w(3,1440)}}).windows[0].label,'每日');
+  assert.equal(normalizeLimits({rateLimits:{primary:w(3,40320)}}).windows[0].label,'每月');
+  assert.equal(normalizeLimits({rateLimits:{primary:w(3,44640)}}).windows[0].label,'每月');
+});
+test('unknown durations stay visible with a duration-derived label',()=>{
+  assert.equal(normalizeLimits({rateLimits:{primary:w(3,21600)}}).windows[0].label,'15 天');
+  assert.equal(normalizeLimits({rateLimits:{primary:w(3,60)}}).windows[0].label,'1 小时');
+  assert.equal(normalizeLimits({rateLimits:{primary:w(3,90)}}).windows[0].label,'90 分钟');
+});
+test('a duplicate duration keeps one row and reports the observed value',()=>{
+  const r=normalizeLimits({rateLimits:{primary:w(5,10080),secondary:w(6,10080)}});
+  assert.equal(r.ok,true);assert.equal(r.queryOk,false);assert.equal(r.windows.length,1);
+  assert.match(r.error,/10080/);
+  const implausible=normalizeLimits({rateLimits:{primary:w(5,527041)}});
+  assert.equal(implausible.ok,false);assert.match(implausible.error,/527041/);
+});
 test('missing and invalid fields stay unavailable, valid zero and full usage survive',()=>{
-  for(const x of [null,{}, {usedPercent:null,windowDurationMins:300,resetsAt:2000000000},w(-1),w(101),w(NaN),w(5,60)])assert.equal(normalizeLimits({rateLimits:{primary:x}}).ok,false);
+  for(const x of [null,{}, {usedPercent:null,windowDurationMins:300,resetsAt:2000000000},w(-1),w(101),w(NaN),w(5,0),w(5,527041)])assert.equal(normalizeLimits({rateLimits:{primary:x}}).ok,false);
   assert.equal(normalizeLimits({rateLimits:{primary:w(0)}}).windows[0].remaining,100);
   assert.equal(normalizeLimits({rateLimits:{primary:w(100)}}).windows[0].remaining,0);
 });

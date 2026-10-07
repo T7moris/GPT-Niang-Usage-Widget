@@ -5,11 +5,31 @@ import readline from 'node:readline';
 import {createHash,randomUUID} from 'node:crypto';
 import {pluginVersion} from './metadata.mjs';
 
+// The transport slot names `primary` / `secondary` carry no fixed meaning: the
+// same account can return a 5-hour window in `primary` and a weekly window in
+// `secondary`, a lone monthly window in `primary`, or a weekly window next to a
+// calendar-month window. Classify every returned window by its own measured
+// duration instead of a plan whitelist, and derive the label from that number.
+const FIXED_WINDOW_LABELS=new Map([[300,'5 小时'],[1440,'每日'],[10080,'每周']]);
+const MONTH_MINUTES_MIN=40320;   // 28 days
+const MONTH_MINUTES_MAX=44640;   // 31 days, covers calendar-month windows such as 43800
+const MAX_WINDOW_MINUTES=527040; // 366 days, rejects implausible values
+
+export function windowLabel(minutes) {
+  const fixed=FIXED_WINDOW_LABELS.get(minutes);
+  if(fixed)return fixed;
+  if(minutes>=MONTH_MINUTES_MIN && minutes<=MONTH_MINUTES_MAX)return '每月';
+  if(minutes%1440===0)return `${minutes/1440} 天`;
+  if(minutes%60===0)return `${minutes/60} 小时`;
+  return `${minutes} 分钟`;
+}
+
 export function normalizeLimits(result, now=Date.now()) {
   const hasBuckets=result && Object.hasOwn(result,'rateLimitsByLimitId') && result.rateLimitsByLimitId!==null;
   const limit = hasBuckets ? result.rateLimitsByLimitId?.codex : result?.rateLimits;
   if(!limit || typeof limit!=='object' || Array.isArray(limit))return {ok:false,queryOk:false,source:'official',observedAt:now,plan:null,windows:[],error:'Codex 额度接口未返回有效额度数据'};
   const windows = [];
+  const rejected=[];
   let invalid=false;
   for (const key of ['primary','secondary']) {
     const raw = limit?.[key];
@@ -17,14 +37,16 @@ export function normalizeLimits(result, now=Date.now()) {
     const used = raw?.usedPercent;
     const reset = raw?.resetsAt;
     if(raw===null || raw===undefined)continue;
-    if(typeof raw!=='object' || !Number.isFinite(mins) || mins<=0 || typeof used!=='number' || !Number.isFinite(used) || used<0 || used>100){invalid=true;continue;}
-    if(![300,10080].includes(mins))continue;
-    if(windows.some(window=>window.minutes===mins)){invalid=true;continue;}
+    if(typeof raw!=='object' || !Number.isFinite(mins) || mins<=0 || mins>MAX_WINDOW_MINUTES || typeof used!=='number' || !Number.isFinite(used) || used<0 || used>100){invalid=true;if(Number.isFinite(mins)&&mins>0)rejected.push(mins);continue;}
+    if(windows.some(window=>window.minutes===mins)){invalid=true;rejected.push(mins);continue;}
     // DateTimeOffset must also be able to represent the Beijing (+08:00) view.
-    windows.push({label:mins===300?'5 小时':'每周',minutes:mins,used,remaining:100-used,resetsAt:typeof reset==='number' && Number.isFinite(reset) && reset>0 && reset<=253402271999?reset:null});
+    windows.push({label:windowLabel(mins),minutes:mins,used,remaining:100-used,resetsAt:typeof reset==='number' && Number.isFinite(reset) && reset>0 && reset<=253402271999?reset:null});
   }
   windows.sort((a,b)=>a.minutes-b.minutes);
-  return {ok:windows.length>0,queryOk:!invalid,source:'official',observedAt:now,plan:typeof limit?.planType==='string'?limit.planType:null,windows,...(invalid?{error:'Codex 额度接口返回的窗口数据不完整'}:{})};
+  // Reporting the observed duration keeps an unrecognized future plan diagnosable
+  // instead of silently claiming the account returned no windows.
+  const observed=[...new Set(rejected)];
+  return {ok:windows.length>0,queryOk:!invalid,source:'official',observedAt:now,plan:typeof limit?.planType==='string'?limit.planType:null,windows,...(invalid?{error:observed.length?`Codex 额度接口返回了不可用的窗口（${observed.join('、')} 分钟）`:'Codex 额度接口返回的窗口数据不完整'}:{})};
 }
 
 // Only a fingerprint of public account/read identity fields is persisted.
@@ -124,7 +146,7 @@ export function readUsage(cli, {timeoutMs=18000,spawnProcess=spawn,onAccount=()=
       } else if(m.id===3){
         if(m.error)return finish(failure('暂时无法读取额度'));
         const data=normalizeLimits(m.result);
-        if(!data.ok && !data.error)data.error='当前账户未返回 5 小时或每周额度';
+        if(!data.ok && !data.error)data.error='当前账户未返回额度窗口';
         data.clearPrevious=(data.queryOk && !data.ok) || !accountKey;
         data.accountKey=accountKey;
         finish(data);

@@ -5,7 +5,20 @@ public struct QuotaWindow: Codable, Equatable, Identifiable {
     public let remaining: Double
     public let resetsAt: Double?
     public var id: Int { minutes }
-    public var title: String { minutes == 300 ? "5 小時" : "每週" }
+    // Mirrors windowLabel() in gpt-niang-usage/runtime/usage.mjs: the window is
+    // described by its own duration, so any plan's windows stay readable.
+    public var title: String {
+        switch minutes {
+        case 300: return "5 小時"
+        case 1440: return "每日"
+        case 10080: return "每週"
+        case 40320...44640: return "每月"
+        default:
+            if minutes % 1440 == 0 { return "\(minutes / 1440) 天" }
+            if minutes % 60 == 0 { return "\(minutes / 60) 小時" }
+            return "\(minutes) 分鐘"
+        }
+    }
 
     public init(minutes: Int, remaining: Double, resetsAt: Double? = nil) {
         self.minutes = minutes; self.remaining = remaining; self.resetsAt = resetsAt
