@@ -1,23 +1,33 @@
 # GPT 娘 macOS
 
+Current release: **1.3.0**. Chinese installation and platform comparison: [project README](../README.md#macos-安装).
+
 A native macOS companion for the Windows GPT 娘 widget. The SwiftUI canvas ports
 v1.2.5's character image, 378-point animation stage, cloud outline, thought bubbles,
 press/rebound Bézier curves, staggered open/close animations, flowing palettes,
 quote transitions, and original sound assets. AppKit owns the transparent panel,
 window following, native pointer capture, and menu bar entry.
 
-## Requirements and launch
+## Requirements
 
 - macOS 13 or newer. The release includes arm64 and x86_64 slices; actual GUI behavior on Intel and older macOS still needs verification.
 - Node.js 20 or newer (no npm dependencies).
 - Codex desktop installed and signed in with a ChatGPT account.
-- Xcode command-line tools / Swift 5.9 or newer to build from source.
+- Source builds only: Xcode command-line tools / Swift 5.9 or newer. The release app does not need Xcode or Swift.
 
 ## Install the release
 
 Download `gpt-niang-usage-widget-v1.3.0-macos-universal.zip` from the [GitHub Release](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest), verify its entry in `SHA256SUMS.txt`, unzip, and move `GPTNiangMac.app` to Applications before opening. Node.js 20+ and a signed-in Codex desktop app are required; Swift/Xcode is needed only for source builds.
 
 The release is ad-hoc signed, not Developer ID signed or notarized. If macOS blocks the first launch, after checking the source and checksum follow [Apple’s instructions](https://support.apple.com/102445) in System Settings → Privacy & Security → Open Anyway.
+
+To calculate the downloaded ZIP’s checksum in Terminal, change to the download directory and run:
+
+```sh
+shasum -a 256 gpt-niang-usage-widget-v1.3.0-macos-universal.zip
+```
+
+Compare the result with the same filename in `SHA256SUMS.txt`; hexadecimal letter case does not matter.
 
 ## Build from source
 
@@ -35,7 +45,8 @@ Passing `--speed` after a run mode opens the separate speed panel at launch.
 `GPT_NIANG_BUILD_CONFIGURATION=release GPT_NIANG_BUILD_UNIVERSAL=1 ./script/build_and_run.sh --build-only` builds the universal release binary.
 
 You can keep the `.app` in a permanent location and open it directly. The local
-build is ad-hoc signed, not Apple notarized; Developer ID signing and notarization are not provided in this release. The app finds the desktop's bundled Codex CLI on each
+build is ad-hoc signed, not Apple notarized; Developer ID signing and notarization
+are not provided in this release. The app finds the desktop's bundled Codex CLI on each
 refresh and supports `GPT_NIANG_CODEX_APP` for a nonstandard Codex app location.
 `GPT_NIANG_NODE` can select a custom Node executable.
 
@@ -97,9 +108,13 @@ Local preferences/quota snapshots live at:
 ~/Library/Application Support/GPTNiangUsage
 ```
 
-To stop, choose **退出 GPT 娘**. To uninstall, first disable login launch if enabled,
-quit, and remove the app. That preserves custom quotes and preferences; remove
-the data directory separately only if you intend to discard them.
+## Update, move, and uninstall
+
+To update, quit GPT 娘 and replace the app in its original location; preferences and custom quotes remain in the data directory above. To move the app, disable login launch first, quit, move it, and enable login launch again from the new location if needed.
+
+Choosing **退出 GPT 娘** quits the Mac application and helpers. Reopening Codex alone does not relaunch GPT 娘; open the `.app` again. Login launch is optional, unlike the Windows installer’s default startup configuration.
+
+To uninstall, disable login launch, quit, and remove the app. Remove the data directory separately only if you want to discard preferences and snapshots. Do not delete Codex’s own login or session data.
 
 ## Verification
 
