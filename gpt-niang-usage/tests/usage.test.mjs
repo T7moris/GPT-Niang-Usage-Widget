@@ -11,6 +11,15 @@ test('prefer current codex bucket over legacy and unrelated model buckets',()=>{
   const r=normalizeLimits({rateLimits:{primary:w(90)},rateLimitsByLimitId:{codex:{primary:w(12),secondary:w(61,10080)},other:{primary:w(98)}}},1000);
   assert.deepEqual(r.windows.map(x=>[x.minutes,x.used,x.remaining]),[[300,12,88],[10080,61,39]]);
 });
+test('ChatGPT Go single 30-day window stays visible instead of collapsing',()=>{
+  const r=normalizeLimits({rateLimits:{primary:w(0,43200),secondary:null}},1000);
+  assert.equal(r.ok,true);assert.equal(r.queryOk,true);
+  assert.deepEqual(r.windows.map(x=>[x.label,x.minutes,x.remaining]),[['30 天',43200,100]]);
+});
+test('unknown window durations are still filtered out',()=>{
+  const r=normalizeLimits({rateLimits:{primary:w(10,1440)}});
+  assert.equal(r.ok,false);assert.equal(r.queryOk,true);
+});
 test('missing current bucket does not borrow a different account or meter',()=>{
   assert.equal(normalizeLimits({rateLimits:{primary:w()},rateLimitsByLimitId:{other:{primary:w()}}}).ok,false);
 });

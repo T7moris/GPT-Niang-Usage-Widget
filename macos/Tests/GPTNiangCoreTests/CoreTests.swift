@@ -15,6 +15,11 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(window.remaining, 0)
         XCTAssertEqual(window.resetText(at: Date(timeIntervalSince1970: 101)), "等待更新後的額度")
     }
+    func testThirtyDayWindowTitleForGoPlan() {
+        XCTAssertEqual(QuotaWindow(minutes: 43200, remaining: 100).title, "30 天")
+        XCTAssertEqual(QuotaWindow(minutes: 300, remaining: 100).title, "5 小時")
+        XCTAssertEqual(QuotaWindow(minutes: 10080, remaining: 100).title, "每週")
+    }
     func testLocalTimeZoneAndShortCountdown() {
         let window = QuotaWindow(minutes: 10080, remaining: 75, resetsAt: 172800)
         XCTAssertEqual(window.resetText(at: Date(timeIntervalSince1970: 0), timeZone: TimeZone(secondsFromGMT: 28800)!), "1/3 08:00 重置")

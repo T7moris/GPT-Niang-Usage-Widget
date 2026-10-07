@@ -5,7 +5,14 @@ public struct QuotaWindow: Codable, Equatable, Identifiable {
     public let remaining: Double
     public let resetsAt: Double?
     public var id: Int { minutes }
-    public var title: String { minutes == 300 ? "5 小時" : "每週" }
+    public var title: String {
+        switch minutes {
+        case 300: return "5 小時"
+        case 10080: return "每週"
+        case 43200: return "30 天"
+        default: return "每週"
+        }
+    }
 
     public init(minutes: Int, remaining: Double, resetsAt: Double? = nil) {
         self.minutes = minutes; self.remaining = remaining; self.resetsAt = resetsAt

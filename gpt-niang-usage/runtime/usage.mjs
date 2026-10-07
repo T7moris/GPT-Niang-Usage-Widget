@@ -18,10 +18,10 @@ export function normalizeLimits(result, now=Date.now()) {
     const reset = raw?.resetsAt;
     if(raw===null || raw===undefined)continue;
     if(typeof raw!=='object' || !Number.isFinite(mins) || mins<=0 || typeof used!=='number' || !Number.isFinite(used) || used<0 || used>100){invalid=true;continue;}
-    if(![300,10080].includes(mins))continue;
+    if(![300,10080,43200].includes(mins))continue;
     if(windows.some(window=>window.minutes===mins)){invalid=true;continue;}
     // DateTimeOffset must also be able to represent the Beijing (+08:00) view.
-    windows.push({label:mins===300?'5 小时':'每周',minutes:mins,used,remaining:100-used,resetsAt:typeof reset==='number' && Number.isFinite(reset) && reset>0 && reset<=253402271999?reset:null});
+    windows.push({label:mins===300?'5 小时':mins===10080?'每周':'30 天',minutes:mins,used,remaining:100-used,resetsAt:typeof reset==='number' && Number.isFinite(reset) && reset>0 && reset<=253402271999?reset:null});
   }
   windows.sort((a,b)=>a.minutes-b.minutes);
   return {ok:windows.length>0,queryOk:!invalid,source:'official',observedAt:now,plan:typeof limit?.planType==='string'?limit.planType:null,windows,...(invalid?{error:'Codex 额度接口返回的窗口数据不完整'}:{})};
@@ -124,7 +124,7 @@ export function readUsage(cli, {timeoutMs=18000,spawnProcess=spawn,onAccount=()=
       } else if(m.id===3){
         if(m.error)return finish(failure('暂时无法读取额度'));
         const data=normalizeLimits(m.result);
-        if(!data.ok && !data.error)data.error='当前账户未返回 5 小时或每周额度';
+        if(!data.ok && !data.error)data.error='当前账户未返回 5 小时、每周或 30 天额度';
         data.clearPrevious=(data.queryOk && !data.ok) || !accountKey;
         data.accountKey=accountKey;
         finish(data);
