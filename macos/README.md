@@ -45,7 +45,13 @@ refresh and supports `GPT_NIANG_CODEX_APP` for a nonstandard Codex app location.
 - Following mode hides the panel when Codex has no visible main window. Turn
   following off to keep it on the desktop. Window bounds come from public
   WindowServer metadata; no accessibility or screen-recording permission is
-  requested. Position checks run four times per second, with a 0.75-second grace period for transient missing metadata; this differs from the
+  requested. The selected window's position is sampled at a target 60 Hz while
+  following; full window discovery runs four times per second and chooses the
+  foremost Codex window. Presence heartbeats are written once per second (and
+  immediately when visibility changes), and optional diagnostics four times per
+  second. Timing depends on main-thread and WindowServer availability; this is
+  polling, not a guarantee of zero-lag attachment. There is a 0.75-second grace
+  period for transient missing metadata; this differs from the
   Windows version's native movement hooks. The panel stays at normal window level
   in following mode so other apps can cover it.
 - Login launch is opt-in through macOS `SMAppService`. Enable it only after moving
