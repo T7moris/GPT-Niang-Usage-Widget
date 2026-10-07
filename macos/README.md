@@ -8,10 +8,18 @@ window following, native pointer capture, and menu bar entry.
 
 ## Requirements and launch
 
-- macOS 13 or newer. This development build was exercised on Apple Silicon / macOS 26.
+- macOS 13 or newer. The release includes arm64 and x86_64 slices; actual GUI behavior on Intel and older macOS still needs verification.
 - Node.js 20 or newer (no npm dependencies).
 - Codex desktop installed and signed in with a ChatGPT account.
 - Xcode command-line tools / Swift 5.9 or newer to build from source.
+
+## Install the release
+
+Download `gpt-niang-usage-widget-v1.3.0-macos-universal.zip` from the [GitHub Release](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest), verify its entry in `SHA256SUMS.txt`, unzip, and move `GPTNiangMac.app` to Applications before opening. Node.js 20+ and a signed-in Codex desktop app are required; Swift/Xcode is needed only for source builds.
+
+The release is ad-hoc signed, not Developer ID signed or notarized. If macOS blocks the first launch, after checking the source and checksum follow [Apple’s instructions](https://support.apple.com/102445) in System Settings → Privacy & Security → Open Anyway.
+
+## Build from source
 
 From the repository root:
 
@@ -24,10 +32,10 @@ The script builds and ad-hoc signs `dist/GPTNiangMac.app`, then opens the app bu
 `--logs`, `--telemetry`, and `--debug` are available for development.
 Passing `--speed` after a run mode opens the separate speed panel at launch.
 `GPT_NIANG_BUILD_CACHE` optionally selects a build cache directory.
+`GPT_NIANG_BUILD_CONFIGURATION=release GPT_NIANG_BUILD_UNIVERSAL=1 ./script/build_and_run.sh --build-only` builds the universal release binary.
 
 You can keep the `.app` in a permanent location and open it directly. The local
-build is ad-hoc signed, not Apple notarized; a public distribution needs Developer
-ID signing and notarization. The app finds the desktop's bundled Codex CLI on each
+build is ad-hoc signed, not Apple notarized; Developer ID signing and notarization are not provided in this release. The app finds the desktop's bundled Codex CLI on each
 refresh and supports `GPT_NIANG_CODEX_APP` for a nonstandard Codex app location.
 `GPT_NIANG_NODE` can select a custom Node executable.
 

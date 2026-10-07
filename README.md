@@ -2,7 +2,7 @@
 
 让一只白发紫瞳的小龙娘，陪你看 Codex 的剩余额度。
 
-**Windows 桌面挂件 · 5 小时 / 每周额度 · 中文语录 · 当前版本 1.2.5**
+**Windows / macOS 桌面挂件 · 5 小时 / 每周额度 · 中文语录 · 当前版本 1.3.0**
 
 [**下载最新版**](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest) · [安装方法](#安装) · [更新记录](更新记录.md) · [反馈问题](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new)
 
@@ -17,19 +17,21 @@
 - **跟随主窗口**：失去焦点时保留；其他窗口覆盖主窗口时，也会覆盖挂件。最小化或隐藏主窗口后挂件隐藏。
 - **自动恢复**：当前用户登录后监测主窗口；重开客户端时自动显示。仅打开宠物 mini 不显示。
 
-这是独立的 Windows 本地挂件及额度查询插件。它读取当前 Codex 登录账户的额度，**不会为读取额度创建聊天或调用模型**。它不是 OpenAI 或 DeepSeek 的官方项目。
+这是独立的桌面挂件；Windows 同时提供额度查询插件。它读取当前 Codex 登录账户的额度，**不会为读取额度创建聊天或调用模型**。它不是 OpenAI 或 DeepSeek 的官方项目。
 
 ## macOS 原生版本
 
 本仓库新增 SwiftUI / AppKit 的 macOS companion，保留原角色、原版按压回弹、分段气泡、语录淡入、流光配色与音效。支持拖动吸附、双击／右键设置、菜单栏和可选登录启动，并提供独立的聊天速度面板。需要 macOS 13+、Node.js 20+ 和已登录的 Codex 桌面端。
 
-从源码运行 `./script/build_and_run.sh`，生成 `dist/GPTNiangMac.app`。完整安装、功能、速度指标解释和验证方式见 [macOS 使用说明](macos/README.md)。原有 Windows Release 安装包仍按下面的方法使用。
+在同一 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest) 选择 **`gpt-niang-usage-widget-v1.3.0-macos-universal.zip`**，解压后把 `GPTNiangMac.app` 移入「应用程序」并打开。内含 Apple Silicon / Intel 通用应用，不需要 Swift 或 Xcode。需要自行安装 Node.js 20+。
+
+Mac 包仅 ad-hoc 签名，未经过 Apple 公证；首次打开可能被系统阻止。确认来源并校验 SHA256 后，按 [Apple 官方说明](https://support.apple.com/102445) 在「系统设置 → 隐私与安全性」确认打开。完整安装、功能、速度指标解释、源码构建与验证方式见 [macOS 使用说明](macos/README.md)。Windows 安装方法如下。
 
 ## 安装
 
 需要 **Windows 10 / 11、Node.js 20 或更新版本，以及已安装并用 ChatGPT 订阅登录的 Codex 桌面端**。
 
-1. 打开 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest)，在 **Assets** 中下载 **`gpt-niang-usage-widget-v1.2.5-windows.zip`**。也可以使用 **Code → Download ZIP** 获取当前源码。
+1. 打开 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest)，在 **Assets** 中下载 **`gpt-niang-usage-widget-v1.3.0-windows.zip`**。也可以使用 **Code → Download ZIP** 获取当前源码。
 2. 将压缩包**完整解压**到准备长期保留的位置；保留 `.agents` 与 `gpt-niang-usage` 文件夹。
 3. 双击根目录的 **`安装GPT娘.cmd`**，等待安装完成。
 4. 打开 Codex 主窗口，龙娘会自动出现。额度查询工具可在新建的聊天中使用。
@@ -40,12 +42,12 @@
 
 ### 安装包校验（建议）
 
-本版 `gpt-niang-usage-widget-v1.2.5-windows.zip` 的 SHA256 见同一 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/tag/v1.2.5) 的 **`SHA256SUMS.txt`**。下载压缩包和校验文件后，确认计算出的哈希与文件中对应的一行一致。
+本版 `gpt-niang-usage-widget-v1.3.0-windows.zip` 的 SHA256 见同一 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/tag/v1.3.0) 的 **`SHA256SUMS.txt`**。下载压缩包和校验文件后，确认计算出的哈希与文件中对应的一行一致。
 
 在 PowerShell 中核对：
 
 ```powershell
-Get-FileHash .\gpt-niang-usage-widget-v1.2.5-windows.zip -Algorithm SHA256
+Get-FileHash .\gpt-niang-usage-widget-v1.3.0-windows.zip -Algorithm SHA256
 ```
 
 哈希不一致说明文件在传输或转载中被替换，请不要安装。请只从本仓库的 Release 页面下载；第三方加速镜像只用于加速，不能当作可信来源。
@@ -139,7 +141,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\gpt-niang-usage\Instal
 
 ## 反馈与参与
 
-遇到问题可以 [提交中文问题反馈](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new)。请说明 Windows / Codex / 挂件版本、复现步骤以及期望效果；截图请裁去对话、账号和其他私人信息。不要上传登录文件或整个状态目录。
+遇到问题可以 [提交中文问题反馈](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new)。请说明操作系统 / Codex / 挂件版本、复现步骤以及期望效果；截图请裁去对话、账号和其他私人信息。不要上传登录文件或整个状态目录。
 
 欢迎改进窗口兼容性、安装流程和可读性；改动后请运行上面的检查。这个版本的角色是静态半身配合按压动画；不包含完整桌宠动作；macOS companion 见上面的说明，尚无 Linux 支持。
 
