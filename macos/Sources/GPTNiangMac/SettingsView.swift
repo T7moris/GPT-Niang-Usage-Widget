@@ -10,7 +10,7 @@ struct SettingsView: View {
         ScrollView { VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .firstTextBaseline) {
                 Text("GPT 娘").font(.system(size: 27, weight: .semibold, design: .rounded))
-                Text("macOS · 1.2.5-mac.1").font(.caption).foregroundStyle(.secondary)
+                Text("macOS · \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")").font(.caption).foregroundStyle(.secondary)
                 Spacer()
             }
             Text("讓小龍娘陪你掌握 Codex 額度。").foregroundStyle(.secondary)

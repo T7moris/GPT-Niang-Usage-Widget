@@ -1,4 +1,4 @@
-name: Test and publish Windows release
+name: Test and publish Windows and macOS release
 
 on:
   push:
@@ -6,17 +6,24 @@ on:
     paths:
       - gpt-niang-usage/package.json
       - gpt-niang-usage/.codex-plugin/plugin.json
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/**
+      - script/**
+      - gpt-niang-usage/package.json
+      - gpt-niang-usage/.codex-plugin/plugin.json
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: windows-release
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
+  windows:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -24,29 +31,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check version and release availability
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $version = (Get-Content gpt-niang-usage/package.json -Raw | ConvertFrom-Json).version
-          $manifest = Get-Content gpt-niang-usage/.codex-plugin/plugin.json -Raw | ConvertFrom-Json
-          if ($version -notmatch '^\d+\.\d+\.\d+$' -or $manifest.version -ne $version) {
-            throw 'Invalid or inconsistent release version.'
-          }
-          $tag = "v$version"
-          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          gh release list --repo $env:GITHUB_REPOSITORY --limit 100 --json tagName | Out-File releases.json -Encoding utf8
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot read existing releases.' }
-          $releases = Get-Content releases.json -Raw | ConvertFrom-Json
-          if ($releases.tagName -contains $tag) { throw "Release $tag already exists; increment the version first." }
       - name: Node runtime tests
         working-directory: gpt-niang-usage
         run: npm test
       - name: Prepare isolated installer executable fixture
         shell: pwsh
         run: |
-          # Installer tests only check this path; they do not query a real account.
           $fixture = Join-Path $env:RUNNER_TEMP 'gpt-niang-test-bin'
           New-Item -ItemType Directory -Path $fixture -Force | Out-Null
           Copy-Item (Get-Command node.exe).Source (Join-Path $fixture 'codex.exe')
@@ -56,11 +46,76 @@ jobs:
         run: npm run test:windows
       - name: Build and verify Windows bundle
         run: python scripts/build-release.py
-      - name: Publish release and assets
-        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/*-windows.zip
+          if-no-files-found: error
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node runtime and crash recovery tests
+        working-directory: gpt-niang-usage
+        run: npm test
+      - name: Swift behavior tests
+        run: swift test --package-path macos
+      - name: Build universal release app
+        env:
+          GPT_NIANG_BUILD_CONFIGURATION: release
+          GPT_NIANG_BUILD_UNIVERSAL: '1'
+        run: ./script/build_and_run.sh --build-only
+      - name: Verify architectures, version, signature and archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./gpt-niang-usage/package.json').version")"
+          lipo dist/GPTNiangMac.app/Contents/MacOS/GPTNiangMac -verify_arch arm64 x86_64
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/GPTNiangMac.app/Contents/Info.plist)" = "$version"
+          codesign --verify --deep --strict dist/GPTNiangMac.app
+          archive="dist/gpt-niang-usage-widget-v$version-macos-universal.zip"
+          ditto -c -k --sequesterRsrc --keepParent dist/GPTNiangMac.app "$archive"
+          mkdir -p "$RUNNER_TEMP/mac-release-check"
+          ditto -x -k "$archive" "$RUNNER_TEMP/mac-release-check"
+          codesign --verify --deep --strict "$RUNNER_TEMP/mac-release-check/GPTNiangMac.app"
+          lipo "$RUNNER_TEMP/mac-release-check/GPTNiangMac.app/Contents/MacOS/GPTNiangMac" -verify_arch arm64 x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: dist/*-macos-universal.zip
+          if-no-files-found: error
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Verify both packages and prepare checksums and release notes
+        run: python scripts/prepare-release.py
+      - name: Publish both platform packages together
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          $archive = "dist/gpt-niang-usage-widget-$env:RELEASE_TAG-windows.zip"
-          gh release create $env:RELEASE_TAG $archive dist/SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title $env:RELEASE_TAG --notes-file dist/release-notes.md --latest
-          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
+          set -euo pipefail
+          version="$(python -c 'import json; print(json.load(open("gpt-niang-usage/package.json"))["version"])')"
+          tag="v$version"
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName > "$RUNNER_TEMP/releases.json"
+          if jq -e --arg tag "$tag" '.[] | select(.tagName == $tag)' "$RUNNER_TEMP/releases.json" >/dev/null; then
+            echo "Release $tag already exists; increment the version first." >&2
+            exit 1
+          fi
+          gh release create "$tag" dist/*-windows.zip dist/*-macos-universal.zip dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$tag · Windows / macOS" --notes-file dist/release-notes.md --draft
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
