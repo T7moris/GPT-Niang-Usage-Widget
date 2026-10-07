@@ -5,7 +5,13 @@ public struct QuotaWindow: Codable, Equatable, Identifiable {
     public let remaining: Double
     public let resetsAt: Double?
     public var id: Int { minutes }
-    public var title: String { minutes == 300 ? "5 小時" : "每週" }
+    public var title: String {
+        if minutes == 300 { return "5 小時" }
+        if minutes == 10080 { return "每週" }
+        if minutes % 1440 == 0 { return "\(minutes / 1440) 天" }
+        if minutes % 60 == 0 { return "\(minutes / 60) 小時" }
+        return "\(minutes) 分鐘"
+    }
 
     public init(minutes: Int, remaining: Double, resetsAt: Double? = nil) {
         self.minutes = minutes; self.remaining = remaining; self.resetsAt = resetsAt
@@ -40,9 +46,12 @@ public struct UsageSnapshot: Decodable {
     public let observedAt: Double?
     public let windows: [QuotaWindow]
     public let error: String?
+    public let plan: String?
+    public let planLabel: String?
 
-    public init(ok: Bool = false, queryOk: Bool? = false, observedAt: Double? = nil, windows: [QuotaWindow] = [], error: String? = nil) {
+    public init(ok: Bool = false, queryOk: Bool? = false, observedAt: Double? = nil, windows: [QuotaWindow] = [], error: String? = nil, plan: String? = nil, planLabel: String? = nil) {
         self.ok = ok; self.queryOk = queryOk; self.observedAt = observedAt; self.windows = windows; self.error = error
+        self.plan = plan; self.planLabel = planLabel
     }
     public func stale(at date: Date) -> Bool {
         guard ok, queryOk != false, let observedAt, observedAt.isFinite else { return true }

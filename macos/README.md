@@ -2,6 +2,8 @@
 
 Current release: **1.3.0**. Chinese installation and platform comparison: [project README](../README.md#macos-安装).
 
+The 1.3.1 source detects Free, Go, Plus, Pro, Team/Business, Enterprise, Edu and future plan identifiers, and renders valid quota windows returned by Codex, including Go's 30-day window. A single window stays centered inside the original bubble. Plan labels do not determine entitlements or invent quota windows. To inspect the installed app's plan without exposing account identity or credentials, run `node /Applications/GPTNiangMac.app/Contents/Resources/Backend/runtime/detect-plan.mjs --json` after upgrading; from source, run `node gpt-niang-usage/runtime/detect-plan.mjs --json` at the repository root.
+
 A native macOS companion for the Windows GPT 娘 widget. The SwiftUI canvas ports
 v1.2.5's character image, 378-point animation stage, cloud outline, thought bubbles,
 press/rebound Bézier curves, staggered open/close animations, flowing palettes,
@@ -14,6 +16,8 @@ window following, native pointer capture, and menu bar entry.
 - Node.js 20 or newer (no npm dependencies).
 - Codex desktop installed and signed in with a ChatGPT account.
 - Source builds only: Xcode command-line tools / Swift 5.9 or newer. The release app does not need Xcode or Swift.
+
+If a CommandLineTools-only source build reports a missing SwiftUI macro plugin, `GPT_NIANG_SDK=/path/to/compatible/MacOSX.sdk ./script/build_and_run.sh --build-only` forwards the selected SDK to Swift. The default build and deployment target are unchanged. This build compatibility change is retained from [PR #8](https://github.com/T7moris/GPT-Niang-Usage-Widget/pull/8).
 
 ## Install the release
 

@@ -38,7 +38,7 @@
         <TextBlock x:Name="Header" Text="剩余额度" HorizontalAlignment="Center" FontSize="12" LineHeight="16" LineStackingStrategy="BlockLineHeight" FontWeight="SemiBold" Foreground="#7D6B91" ToolTip="重置时间按当前机器的本地时间显示"/>
         <StackPanel x:Name="ShortRow" Margin="0,1,0,0">
         <Grid Height="25">
-          <TextBlock Text="5 小时" FontSize="13" VerticalAlignment="Center" Foreground="#76638D"/>
+          <TextBlock x:Name="ShortLabel" Text="5 小时" FontSize="13" VerticalAlignment="Center" Foreground="#76638D"/>
           <TextBlock x:Name="ShortLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Segoe UI" FontSize="24" LineHeight="25" LineStackingStrategy="BlockLineHeight" FontWeight="Bold" Foreground="#745A98"/>
         </Grid>
         <Border Height="4" Background="#EAE4F3" CornerRadius="2" Margin="0,1,0,0">
@@ -49,7 +49,7 @@
         </StackPanel>
         <StackPanel x:Name="WeekRow" Margin="0,4,0,0">
         <Grid Height="25">
-          <TextBlock Text="每周" FontSize="13" VerticalAlignment="Center" Foreground="#76638D"/>
+          <TextBlock x:Name="WeekLabel" Text="每周" FontSize="13" VerticalAlignment="Center" Foreground="#76638D"/>
           <TextBlock x:Name="WeekLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Segoe UI" FontSize="24" LineHeight="25" LineStackingStrategy="BlockLineHeight" FontWeight="Bold" Foreground="#745A98"/>
         </Grid>
         <Border Height="4" Background="#EAE4F3" CornerRadius="2" Margin="0,1,0,0">

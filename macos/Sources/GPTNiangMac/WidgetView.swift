@@ -123,6 +123,7 @@ struct WidgetView: View {
             } else {
                 VStack(spacing: 2) {
                     Text("剩餘額度").font(.system(size: 12, weight: .semibold)).foregroundStyle(style("ink", phase: phase))
+                        .help("目前方案：\(model.snapshot.planLabel ?? "未知套餐")")
                     if model.snapshot.windows.isEmpty {
                         Text(model.snapshot.error ?? "目前帳戶未提供額度視窗")
                             .font(.system(size: 12)).foregroundStyle(Color(hex: "7D6B91")).multilineTextAlignment(.center)

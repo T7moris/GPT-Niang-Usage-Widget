@@ -12,6 +12,12 @@ export CLANG_MODULE_CACHE_PATH="$TASK_CACHE/clang"
 export SWIFTPM_MODULECACHE_OVERRIDE="$TASK_CACHE/clang"
 BUILD_ARGS=(--package-path "$ROOT_DIR/macos" --disable-sandbox --cache-path "$TASK_CACHE/swiftpm" --configuration "${GPT_NIANG_BUILD_CONFIGURATION:-debug}")
 if [ "${GPT_NIANG_BUILD_UNIVERSAL:-0}" = 1 ]; then BUILD_ARGS+=(--arch arm64 --arch x86_64); fi
+# Xcode 27's SwiftUI declares @State as a macro whose plugin ships only with full
+# Xcode. Building against an SDK that still exposes the property-wrapper form keeps
+# CommandLineTools-only machines working; deployment target is unchanged.
+if [ -n "${GPT_NIANG_SDK:-}" ]; then
+  BUILD_ARGS+=(--sdk "$GPT_NIANG_SDK")
+fi
 VERSION="$(node -p "require(process.argv[1]).version" "$ROOT_DIR/gpt-niang-usage/package.json")"
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid version" >&2; exit 1; fi
 swift build "${BUILD_ARGS[@]}"

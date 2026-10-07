@@ -84,8 +84,8 @@ function Test-WidgetColorActive([string]$Text){
 }
 function Restore-WidgetOriginalColors([switch]$KeepAnimation) {
   foreach($binding in $script:widgetColors.original){$binding.element.($binding.property)=$binding.value}
-  foreach($row in @(@{prefix='Short';minutes=300},@{prefix='Week';minutes=10080})){
-    $q=@($script:status.windows|Where-Object{$_.minutes-eq $row.minutes})|Select-Object -First 1
+  foreach($row in (Get-QuotaRows)){
+    $q=$row.window
     $expired=$q -and $q.resetsAt -and [double]$q.resetsAt-le [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     $ink=if(!$q -or $expired){'#95889F'}elseif([double]$q.used-ge 90){'#B74839'}elseif([double]$q.used-ge 75){'#A06C1C'}else{'#745A98'}
     $bar=if(!$q){'#AA95CD'}elseif($expired){'#B3A7C0'}elseif([double]$q.used-ge 90){'#D77659'}elseif([double]$q.used-ge 75){'#D0A051'}else{'#9B86C1'}
@@ -217,8 +217,8 @@ function Update-WidgetColorScene {
   foreach($name in @('BubbleShape','Tail','TailNear')){$script:ui[$name].Stroke=$accent;$script:ui[$name].Fill=$surface}
   foreach($name in @('Header','QuoteText','Refresh','MenuButton')){$script:ui[$name].Foreground=$ink}
   $script:ui.MenuButton.Background=$surface
-  foreach($row in @(@{prefix='Short';minutes=300},@{prefix='Week';minutes=10080})){
-    $q=@($script:status.windows|Where-Object{$_.minutes-eq $row.minutes})|Select-Object -First 1
+  foreach($row in (Get-QuotaRows)){
+    $q=$row.window
     $expired=$q -and $q.resetsAt -and [double]$q.resetsAt-le [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     # Preserve existing orange/red quota warnings and unavailable values.
     if($q -and !$expired -and [double]$q.used-lt 75){
