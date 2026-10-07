@@ -23,7 +23,7 @@ changes = changelog.split(heading, 1)[1].split("\n## ", 1)[0].strip()
 tracked = subprocess.check_output(
     ["git", "ls-files", "-z"], cwd=root
 ).decode("utf-8").split("\0")
-files = sorted(p for p in tracked if p and not p.startswith((".github/", "scripts/")))
+files = sorted(p for p in tracked if p and not p.startswith((".github/", "scripts/", ".codex/", "macos/", "script/")))
 required = {
     ".agents/plugins/marketplace.json", manifest_path,
     "安装GPT娘.cmd", "停用GPT娘.cmd", "打开GPT娘.cmd",

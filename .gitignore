@@ -18,3 +18,11 @@ Thumbs.db
 **/preview.png
 **/.env
 **/.env.*
+
+# macOS build intermediates and local diagnostics
+**/.build/
+**/.build-cache/
+**/.swiftpm/
+**/gui.lock
+**/worker-ownership.lock
+**/worker.log

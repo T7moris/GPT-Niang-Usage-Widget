@@ -1,0 +1,48 @@
+name: Verify Windows runtime and macOS companion
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Shared Node runtime tests
+        working-directory: gpt-niang-usage
+        run: npm test
+      - name: Prepare isolated installer fixture
+        shell: pwsh
+        run: |
+          $fixture = Join-Path $env:RUNNER_TEMP 'gpt-niang-test-bin'
+          New-Item -ItemType Directory -Path $fixture -Force | Out-Null
+          Copy-Item (Get-Command node.exe).Source (Join-Path $fixture 'codex.exe')
+          $fixture | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Windows installer, lifecycle and WPF tests
+        working-directory: gpt-niang-usage
+        run: npm run test:windows
+      - name: Verify Windows packaging
+        run: python scripts/build-release.py
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Shared Node runtime and crash recovery tests
+        working-directory: gpt-niang-usage
+        run: npm test
+      - name: Swift behavior tests
+        run: swift test --package-path macos
+      - name: Build native app bundle
+        run: ./script/build_and_run.sh --build-only
+      - name: Verify app signature
+        run: codesign --verify --deep --strict dist/GPTNiangMac.app

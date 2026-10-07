@@ -55,3 +55,28 @@ test('PATH is a fallback and ignores blank, missing, and directory entries',t=>{
   assert.equal(resolveCodexExecutable(missing,{env:{},platform:'win32'}),missing);
   assert.equal(resolveCodexExecutable(root,{env:{},platform:'win32'}),root);
 });
+
+
+test('macOS finds the bundled desktop CLI without a shell PATH',t=>{
+  const {root,write}=fixture(t);
+  const app=path.join(root,'Codex.app');
+  const cli=write('Codex.app/Contents/Resources/codex-cli/bin/codex');
+  assert.equal(resolveCodexExecutable(undefined,{platform:'darwin',env:{GPT_NIANG_CODEX_APP:app}}),cli);
+});
+
+test('macOS falls back to the bundled signed CLI and honors a valid override',t=>{
+  const {root,write}=fixture(t);
+  const app=path.join(root,'Codex.app');
+  const cli=write('Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex');
+  const custom=write('custom/codex');
+  assert.equal(resolveCodexExecutable(path.join(root,'removed'),{platform:'darwin',env:{GPT_NIANG_CODEX_APP:app}}),cli);
+  assert.equal(resolveCodexExecutable(custom,{platform:'darwin',env:{GPT_NIANG_CODEX_APP:app}}),custom);
+});
+
+// This fixture uses a POSIX PATH; a Windows drive letter contains its delimiter.
+test('macOS missing-app fixtures cannot discover a real desktop account',{skip:process.platform==='win32'},t=>{
+  const {root,write}=fixture(t);
+  const cli=write('path-bin/codex');
+  assert.equal(resolveCodexExecutable(undefined,{platform:'darwin',env:{GPT_NIANG_CODEX_APP:path.join(root,'absent.app'),PATH:path.dirname(cli)}}),cli);
+  assert.equal(resolveCodexExecutable(undefined,{platform:'darwin',env:{GPT_NIANG_CODEX_APP:path.join(root,'absent.app')}}),undefined);
+});
