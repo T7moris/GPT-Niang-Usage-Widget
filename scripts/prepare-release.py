@@ -64,7 +64,7 @@ Mac 应用仅 ad-hoc 签名，未使用 Developer ID、未经过 Apple 公证。
 
 `SHA256SUMS.txt` 同时包含两个安装包的校验值；GitHub 自动附带的 Source code 是源码，不是安装包。
 
-感谢 @meaqua9420（PR #3，macOS 原生版本）、@TheRuabit（PR #4，UTF-8 安装修复），以及 @Admilkk（PR #1，额度与后台可靠性）。窗口跟随优化见 PR #5。
+感谢 @meaqua9420（PR #3，macOS 原生版本）、@TheRuabit（PR #4，UTF-8 安装修复）、@Admilkk（PR #1，额度与后台可靠性），以及 [@FusaishiHaruaki-afk](https://github.com/FusaishiHaruaki-afk)（PR #8 / #9，Go 实测、按窗口时长适配及 Mac 构建兼容）。窗口跟随优化见 PR #5。
 '''
 (dist / 'release-notes.md').write_text(notes)
 print(f'Validated both platform archives for v{version}')

@@ -27,6 +27,12 @@ final class CoreTests: XCTestCase {
         let legacy = try JSONDecoder().decode(UsageSnapshot.self, from: Data(#"{"ok":true,"windows":[]}"#.utf8))
         XCTAssertNil(legacy.plan)
     }
+    // PR #9 cases retain the current exact-duration titles, including Go's 30 days.
+    func testCalendarLikeAndFutureWindowTitlesKeepTheirActualDuration() {
+        for (minutes, title) in [(40320, "28 天"), (43200, "30 天"), (43800, "730 小時"), (44640, "31 天"), (21600, "15 天"), (90, "90 分鐘")] {
+            XCTAssertEqual(QuotaWindow(minutes: minutes, remaining: 100).title, title)
+        }
+    }
     func testLocalTimeZoneAndShortCountdown() {
         let window = QuotaWindow(minutes: 10080, remaining: 75, resetsAt: 172800)
         XCTAssertEqual(window.resetText(at: Date(timeIntervalSince1970: 0), timeZone: TimeZone(secondsFromGMT: 28800)!), "1/3 08:00 重置")

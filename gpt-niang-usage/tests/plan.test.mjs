@@ -80,3 +80,16 @@ test('no windows, malformed windows and unsupported authentication do not masque
   assert.equal(api.errorCode,'AUTH_MODE_UNSUPPORTED');assert.equal(api.authType,'apiKey');
   assert.equal(server.methods.includes('account/rateLimits/read'),false);
 });
+
+// PR #9 regression cases, resolved using the existing exact-duration labels.
+test('transport slots and calendar-like durations do not determine plan window meaning',()=>{
+  const swapped=normalizeLimits({rateLimits:{planType:'pro',primary:window(10080,10),secondary:window(300,20)}});
+  assert.deepEqual(swapped.windows.map(w=>[w.label,w.minutes,w.remaining]),[['5 小时',300,80],['每周',10080,90]]);
+  const monthly=normalizeLimits({rateLimits:{planType:'team',primary:window(10080,5),secondary:window(43800,7)}});
+  assert.equal(monthly.queryOk,true);
+  assert.deepEqual(monthly.windows.map(w=>[w.label,w.minutes,w.remaining]),[['每周',10080,95],['730 小时',43800,93]]);
+  for(const [minutes,label] of [[40320,'28 天'],[43200,'30 天'],[44640,'31 天'],[21600,'15 天'],[90,'90 分钟']]) {
+    const actual=normalizeLimits({rateLimits:{primary:window(minutes)}});
+    assert.equal(actual.queryOk,true);assert.equal(actual.windows[0].label,label);
+  }
+});

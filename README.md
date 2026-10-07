@@ -22,7 +22,7 @@
 
 ## 套餐适配与自动检测
 
-Windows 与 macOS 共用按实际返回值解析的后端。自动识别 Free、Go、Plus、Pro、Team、Business、Enterprise、Edu；遇到未来套餐保留其标识。**套餐名称不决定显示哪些窗口，也不代表额外授予接口权限**。Go 的 30 天窗口是 `43200` 分钟；其他合法时长也会显示为小时、天或分钟，不再被白名单过滤。两个平台保留原来的气泡外观、单行居中、刷新、重置时间和动画行为。
+Windows 与 macOS 共用按实际返回值解析的后端。自动识别 Free、Go、Plus、Pro、Team、Business、Enterprise、Edu；遇到未来套餐保留其标识。**套餐名称不决定显示哪些窗口，也不代表额外授予接口权限**。Go 的 30 天窗口是 `43200` 分钟；其他合法时长也会显示为小时、天或分钟，不再被白名单过滤。`primary` / `secondary` 只是接口槽位，窗口按自身时长识别并排序；`43800` 等非 30 天时长同样可显示。整合 PR #9 时沿用当前代码和准确时长标签，因此 Go 保持「30 天」，单个窗口仍居中。两个平台保留原来的气泡外观、单行居中、刷新、重置时间和动画行为。
 
 Windows 双击根目录 `检测套餐.cmd`，或执行 `powershell.exe -NoProfile -File .\gpt-niang-usage\Detect-Plan.ps1 -Json`。从源码检查 Windows / macOS 均可执行：
 
@@ -224,7 +224,7 @@ Windows 界面使用 PowerShell / WPF，Mac 界面使用 SwiftUI / AppKit，额�
 
 ## 致谢与许可
 
-感谢 @meaqua9420 贡献 macOS 原生版本（PR #3）、@TheRuabit 修复 Windows 安装器 UTF-8 解码（PR #4）、@Admilkk 改进额度显示与后台可靠性（PR #1）。
+感谢 @meaqua9420 贡献 macOS 原生版本（PR #3）、@TheRuabit 修复 Windows 安装器 UTF-8 解码（PR #4）、@Admilkk 改进额度显示与后台可靠性（PR #1），以及 [@FusaishiHaruaki-afk](https://github.com/FusaishiHaruaki-afk) 提供 Go 账号实测、30 天额度适配、按窗口时长显示的改进方案和 Mac 构建兼容修复（[PR #8](https://github.com/T7moris/GPT-Niang-Usage-Widget/pull/8)、[PR #9](https://github.com/T7moris/GPT-Niang-Usage-Widget/pull/9)）。
 
 交互参考 [DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)。Windows WPF 与 Mac 原生界面分别实现，使用原创语录及合成提示音，没有打包 DSH 原角色、动图或音效。具体对照见 [功能对照](gpt-niang-usage/DSH功能对照.md)。
 
