@@ -117,6 +117,12 @@ shasum -a 256 gpt-niang-usage-widget-v1.3.1-macos-universal.zip
 | Mac：双击角色或从菜单栏进入设置 | 调整外观、窗口跟随和登录启动 |
 | Mac：菜单选择「退出 GPT 娘」 | 退出应用和后台 helper；需重新打开 `.app` 才会再次显示 |
 
+内置语录已同步为作者确认的 **33 句**，包括「高性能↓」「我不是吃白饭的大肥鱼」「我是啥龙？」和三句 token／储存台词。本次直接更新 1.3.1 安装包，版本号不变；重新下载时请核对最新 `SHA256SUMS.txt`。
+
+升级会保留各台电脑的自定义语录。若要使用这份内置台词池，在语录设置里选择「恢复内置语录」（Mac 为「恢复默认」）；恢复前请备份自行添加的句子，Windows会自动保留旧列表备份。自定义文件只保存在本机，不会随账户同步到另一台电脑。
+
+语录变色彩蛋默认按每句独立抽取：全挂件变色 **0.5%**、仅文字变色 **3%**、原色 **96.5%**。
+
 ## 数据与隐私
 
 - 额度通过本机 Codex App Server 查询。项目没有自己的云服务器、遥测或外部上传功能。
@@ -135,7 +141,7 @@ shasum -a 256 gpt-niang-usage-widget-v1.3.1-macos-universal.zip
 | Windows | `%LOCALAPPDATA%\GPTNiangUsage\state` |
 | macOS | `~/Library/Application Support/GPTNiangUsage` |
 
-`installation.json` 由本机生成，不随安装包分发。本仓库不包含作者的本机安装配置、账户快照、个人语录或聊天截图。
+`installation.json` 由本机生成，不随安装包分发。本仓库不包含本机安装配置、账户快照或聊天截图；只发布作者确认的内置语录，不上传用户数据目录里的自定义文件。
 
 ## 更新、移动与卸载
 
@@ -226,6 +232,6 @@ Windows 界面使用 PowerShell / WPF，Mac 界面使用 SwiftUI / AppKit，额�
 
 感谢 @meaqua9420 贡献 macOS 原生版本（PR #3）、@TheRuabit 修复 Windows 安装器 UTF-8 解码（PR #4）、@Admilkk 改进额度显示与后台可靠性（PR #1），以及 [@FusaishiHaruaki-afk](https://github.com/FusaishiHaruaki-afk) 提供 Go 账号实测、30 天额度适配、按窗口时长显示的改进方案和 Mac 构建兼容修复（[PR #8](https://github.com/T7moris/GPT-Niang-Usage-Widget/pull/8)、[PR #9](https://github.com/T7moris/GPT-Niang-Usage-Widget/pull/9)）。
 
-交互参考 [DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)。Windows WPF 与 Mac 原生界面分别实现，使用原创语录及合成提示音，没有打包 DSH 原角色、动图或音效。具体对照见 [功能对照](gpt-niang-usage/DSH功能对照.md)。
+交互参考 [DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)。Windows WPF 与 Mac 原生界面分别实现，语录包含原创、用户提供及7句上游文本，来源和MIT许可见 [语录许可](gpt-niang-usage/assets/quotes-LICENSE.txt)。使用合成提示音，没有打包 DSH 原角色、动图或音效。具体对照见 [功能对照](gpt-niang-usage/DSH功能对照.md)。
 
 代码采用 [MIT License](LICENSE)。龙娘图由 ImageGen 根据用户提供的角色参考生成；参考角色及相关形象权利仍归相应权利人，代码许可不构成对第三方角色或商标的授权。详见 [素材说明](gpt-niang-usage/assets/生成说明.md)。

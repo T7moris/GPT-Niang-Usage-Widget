@@ -6,6 +6,8 @@ on:
     paths:
       - gpt-niang-usage/package.json
       - gpt-niang-usage/.codex-plugin/plugin.json
+      - gpt-niang-usage/assets/quotes.json
+      - gpt-niang-usage/assets/quote-layouts.json
   pull_request:
     paths:
       - .github/workflows/release.yml
@@ -114,8 +116,19 @@ jobs:
           tag="v$version"
           gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName > "$RUNNER_TEMP/releases.json"
           if jq -e --arg tag "$tag" '.[] | select(.tagName == $tag)' "$RUNNER_TEMP/releases.json" >/dev/null; then
-            echo "Release $tag already exists; increment the version first." >&2
-            exit 1
+            latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+            test "$latest" = "$tag" || { echo "Only the latest release may receive a quote refresh." >&2; exit 1; }
+            git fetch --no-tags origin "refs/tags/$tag:refs/tags/$tag"
+            if git diff --quiet "$tag" "$GITHUB_SHA" -- gpt-niang-usage/assets/quotes.json; then
+              echo "Release $tag already exists without a quote update; increment the version first." >&2
+              exit 1
+            fi
+            current="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+            test "$current" = "$GITHUB_SHA" || { echo "Main changed during the build; refusing to replace newer assets." >&2; exit 1; }
+            gh release upload "$tag" dist/*-windows.zip dist/*-macos-universal.zip dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" -f sha="$GITHUB_SHA" -F force=true
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file dist/release-notes.md --latest
+            exit 0
           fi
           gh release create "$tag" dist/*-windows.zip dist/*-macos-universal.zip dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$tag · Windows / macOS" --notes-file dist/release-notes.md --draft
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest

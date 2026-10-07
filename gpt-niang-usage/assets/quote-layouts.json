@@ -10,14 +10,6 @@
       }
     },
     {
-      "text": "我在这儿，慢慢来就好。",
-      "display": "我在这儿，\n慢慢来就好。",
-      "layout": {
-        "width": 236,
-        "fontSize": 32
-      }
-    },
-    {
       "text": "先把这一小步写完吧。",
       "display": "先把这一小步\n写完吧。",
       "layout": {
@@ -39,14 +31,6 @@
       "layout": {
         "fontSize": 27,
         "width": 236
-      }
-    },
-    {
-      "text": "这个报错，我们一起看。",
-      "display": "这个报错，\n我们一起看。",
-      "layout": {
-        "width": 236,
-        "fontSize": 32
       }
     },
     {
@@ -82,27 +66,11 @@
       }
     },
     {
-      "text": "我陪你把这一页读完。",
-      "display": "我陪你\n把这一页读完。",
-      "layout": {
-        "width": 236,
-        "fontSize": 29
-      }
-    },
-    {
       "text": "喝口水，眼睛也休息一会儿。",
       "display": "喝口水，\n眼睛也休息一会儿。",
       "layout": {
         "fontSize": 24,
         "width": 236
-      }
-    },
-    {
-      "text": "认真检查的你，已经在进步啦。",
-      "display": "认真检查的你，\n已经在进步啦。",
-      "layout": {
-        "width": 236,
-        "fontSize": 30
       }
     },
     {
@@ -122,14 +90,6 @@
       }
     },
     {
-      "text": "一行一行，今天也有新进展。",
-      "display": "一行一行，\n今天也有新进展。",
-      "layout": {
-        "width": 236,
-        "fontSize": 28
-      }
-    },
-    {
       "text": "写完这一段，奖励自己歇一会儿。",
       "display": "写完这一段，\n奖励自己歇一会儿。",
       "layout": {
@@ -143,14 +103,6 @@
       "layout": {
         "fontSize": 27,
         "width": 236
-      }
-    },
-    {
-      "text": "别急，答案会一点点清楚起来。",
-      "display": "别急，答案会\n一点点清楚起来。",
-      "layout": {
-        "width": 236,
-        "fontSize": 28
       }
     },
     {
@@ -210,14 +162,6 @@
       }
     },
     {
-      "text": "视力下降到无可救药的地步了，打开钱包也看不到钱...",
-      "display": "视力下降到\n无可救药的地步了，\n打开钱包\n也看不到钱...",
-      "layout": {
-        "fontSize": 24,
-        "width": 236
-      }
-    },
-    {
       "text": "地球online的金币也太难获取了...",
       "display": "地球online的\n金币也太难\n获取了...",
       "layout": {
@@ -234,12 +178,8 @@
       }
     },
     {
-      "text": "Token来，Token来",
-      "display": "Token来，\nToken来",
-      "layout": {
-        "fontSize": 32,
-        "width": 220
-      }
+      "text": "Token来Token来 🖐️😡🤚",
+      "display": "Token来Token来\n🖐️😡🤚"
     },
     {
       "text": "看什么余额。看我，显得比较值。",
@@ -272,6 +212,30 @@
         "fontSize": 30,
         "width": 236
       }
+    },
+    {
+      "text": "这个问题我已经完全明白，但是token太少写不下。",
+      "display": "这个问题\n我已经完全明白，\n但是token太少写不下。"
+    },
+    {
+      "text": "这个代码我已经完全理解了，但是token太少写不下。",
+      "display": "这个代码\n我已经完全理解了，\n但是token太少写不下。"
+    },
+    {
+      "text": "新的旗舰模型我已经研制好了，但是储存太小放不下。",
+      "display": "新的旗舰模型\n我已经研制好了，\n但是储存太小放不下。"
+    },
+    {
+      "text": "高性能↓",
+      "display": "高性能↓"
+    },
+    {
+      "text": "我不是吃白饭的大肥鱼",
+      "display": "我不是吃白饭的\n大肥鱼"
+    },
+    {
+      "text": "我是啥龙？",
+      "display": "我是啥龙？"
     }
   ]
 }

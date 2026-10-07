@@ -1,4 +1,4 @@
-﻿# Original local quotes. No network or account data is used.
+﻿# Bundled local quotes; attribution is in assets/quotes-LICENSE.txt. No network or account data is used.
 $script:widgetQuotesBuiltInPath=Join-Path $PSScriptRoot '..\assets\quotes.json'
 $script:widgetQuoteRandom=New-Object System.Random
 $script:widgetQuoteLastByDataDir=@{}

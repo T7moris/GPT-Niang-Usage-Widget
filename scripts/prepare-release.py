@@ -7,11 +7,11 @@ import zipfile
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-version = json.loads((root / 'gpt-niang-usage/package.json').read_text())['version']
-manifest = json.loads((root / 'gpt-niang-usage/.codex-plugin/plugin.json').read_text())
+version = json.loads((root / 'gpt-niang-usage/package.json').read_text(encoding='utf-8-sig'))['version']
+manifest = json.loads((root / 'gpt-niang-usage/.codex-plugin/plugin.json').read_text(encoding='utf-8-sig'))
 if not re.fullmatch(r'\d+\.\d+\.\d+', version) or manifest['version'] != version:
     raise SystemExit('Invalid or inconsistent release version')
-changelog = (root / '更新记录.md').read_text()
+changelog = (root / '更新记录.md').read_text(encoding='utf-8-sig')
 if changelog.split('## ', 1)[1].splitlines()[0] != version:
     raise SystemExit('First changelog entry must match the release version')
 changes = changelog.split(f'## {version}\n', 1)[1].split('\n## ', 1)[0].strip()
@@ -28,6 +28,7 @@ for name in [windows, macos]:
             packed = json.loads(archive.read('GPT娘额度挂件/gpt-niang-usage/.codex-plugin/plugin.json'))
             if packed['version'] != version:
                 raise SystemExit('Windows archive version differs')
+            quote_path = 'GPT娘额度挂件/gpt-niang-usage/assets/quotes.json'
         else:
             info = plistlib.loads(archive.read('GPTNiangMac.app/Contents/Info.plist'))
             if info['CFBundleShortVersionString'] != version or info['CFBundleVersion'] != version:
@@ -39,8 +40,11 @@ for name in [windows, macos]:
             packed = json.loads(archive.read('GPTNiangMac.app/Contents/Resources/Backend/.codex-plugin/plugin.json'))
             if packed['version'] != version:
                 raise SystemExit('Mac backend version differs')
+            quote_path = 'GPTNiangMac.app/Contents/Resources/quotes.json'
+        if archive.read(quote_path) != (root / 'gpt-niang-usage/assets/quotes.json').read_bytes():
+            raise SystemExit(f'{name} contains an outdated quote pool')
     checksums.append(f'{hashlib.sha256(path.read_bytes()).hexdigest().upper()}  {name}')
-(dist / 'SHA256SUMS.txt').write_text('\n'.join(checksums) + '\n')
+(dist / 'SHA256SUMS.txt').write_text('\n'.join(checksums) + '\n', encoding='utf-8')
 notes = f'''## {version}
 
 {changes}
@@ -66,5 +70,5 @@ Mac 应用仅 ad-hoc 签名，未使用 Developer ID、未经过 Apple 公证。
 
 感谢 @meaqua9420（PR #3，macOS 原生版本）、@TheRuabit（PR #4，UTF-8 安装修复）、@Admilkk（PR #1，额度与后台可靠性），以及 [@FusaishiHaruaki-afk](https://github.com/FusaishiHaruaki-afk)（PR #8 / #9，Go 实测、按窗口时长适配及 Mac 构建兼容）。窗口跟随优化见 PR #5。
 '''
-(dist / 'release-notes.md').write_text(notes)
+(dist / 'release-notes.md').write_text(notes, encoding='utf-8')
 print(f'Validated both platform archives for v{version}')

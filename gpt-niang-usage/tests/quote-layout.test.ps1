@@ -12,7 +12,12 @@ $script:ui.Refresh.Visibility=[Windows.Visibility]::Collapsed
 $script:ui.QuoteText.Visibility=[Windows.Visibility]::Visible
 $script:bubbleMode='quote'
 $profiles=Get-Content -LiteralPath (Join-Path $app 'assets\quote-layouts.json') -Raw -Encoding UTF8|ConvertFrom-Json
-$values=@($profiles.quotes.text)+@('好模型',('自定义测试' * 40))
+. (Join-Path $app 'runtime\quotes.ps1')
+$freshData=Join-Path ([IO.Path]::GetTempPath()) ('gpt-niang-quotes-'+[Guid]::NewGuid().ToString('N'))
+$defaults=Get-WidgetQuoteSettings $freshData
+if($defaults.source-ne 'built-in' -or $defaults.error){throw 'A fresh installation must load the bundled quote pool'}
+foreach($row in $defaults.quotes){if(!$script:quoteLayoutMap.ContainsKey($row.text)){throw ('Bundled quote lacks a reviewed layout: '+$row.text)}}
+$values=@($defaults.quotes.text)+@('好模型',('自定义测试' * 40))
 function Add-QuoteInk($drawing,[Windows.Media.Matrix]$matrix){
   if($drawing-is [Windows.Media.DrawingGroup]){
     if($drawing.Transform){$next=$drawing.Transform.Value;$next.Append($matrix)}else{$next=$matrix}
