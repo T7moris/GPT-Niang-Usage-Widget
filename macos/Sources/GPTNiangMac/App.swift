@@ -28,6 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var lockDescriptor: Int32 = -1
     private var hostRect: CGRect?
     private var lastHostNumber: Int?
+    private var selectedHostNumber: Int?
+    private var hostApplication: NSRunningApplication?
+    private var cadence = WindowFollowCadence()
     private var wasCodexFrontmost = false
     private var missingHostSince: Date?
     private var dragOrigin: CGPoint?
@@ -63,9 +66,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         buildMenu()
         model.start()
         updateWindow()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        let followTimer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.updateWindow() }
         }
+        // Keep following while AppKit is tracking a pointer or menu.
+        RunLoop.main.add(followTimer, forMode: .common)
+        timer = followTimer
         if args.contains("--speed") { showSpeed() }
         logger.info("macOS widget launched")
     }
@@ -130,28 +136,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true)
         speedWindow?.makeKeyAndOrderFront(nil)
     }
-    private func codexWindow() -> (CGRect, Int)? {
-        guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").first,
-              !app.isHidden,
-              let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
-        var candidates: [(CGRect, Int)] = []
+    private func codexWindow(now: TimeInterval, frontmost: Bool) -> (CGRect, Int)? {
+        let discover = cadence.discover(now: now, force: frontmost && !wasCodexFrontmost)
+        if discover {
+            hostApplication = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").first
+        }
+        guard let app = hostApplication, !app.isTerminated, !app.isHidden else { return nil }
+        let options: CGWindowListOption = discover ? [.optionOnScreenOnly, .excludeDesktopElements] : [.optionIncludingWindow]
+        let windowID: CGWindowID? = discover ? kCGNullWindowID : selectedHostNumber.map { CGWindowID($0) }
+        guard let windowID,
+              let windows = CGWindowListCopyWindowInfo(options, windowID) as? [[String: Any]] else { return nil }
         for window in windows {
             guard (window[kCGWindowOwnerPID as String] as? Int32) == app.processIdentifier,
                   (window[kCGWindowLayer as String] as? Int) == 0,
+                  (window[kCGWindowIsOnscreen as String] as? Bool) == true,
                   let bounds = window[kCGWindowBounds as String] as? [String: CGFloat],
                   let width = bounds["Width"], let height = bounds["Height"], width >= 480, height >= 300,
                   let number = window[kCGWindowNumber as String] as? Int else { continue }
             let quartz = CGRect(x: bounds["X"] ?? 0, y: bounds["Y"] ?? 0, width: width, height: height)
             let frame = WidgetPlacement.appKitRect(quartz: quartz, mainDisplayHeight: CGDisplayBounds(CGMainDisplayID()).height)
-            candidates.append((frame, number))
+            // A full list is front-to-back: choose the current foremost Codex
+            // window rather than retaining an older, still-visible window.
+            selectedHostNumber = number
+            return (frame, number)
         }
-        return candidates.first(where: { $0.1 == lastHostNumber }) ?? candidates.first
+        selectedHostNumber = nil
+        return nil
     }
     private func updateWindow() {
         guard model != nil, panel != nil else { return }
         var size = CGSize(width: 378 * model.scale, height: 378 * model.scale)
-        let host = codexWindow()
+        let now = ProcessInfo.processInfo.systemUptime
         let codexFrontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.openai.codex"
+        let host = model.followCodex ? codexWindow(now: now, frontmost: codexFrontmost) : nil
         var visible = false
         if model.followCodex {
             panel.level = .normal
@@ -170,7 +187,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 visible = true; lastHostNumber = number; if model.trackingNote != nil { model.trackingNote = nil }
             } else {
                 if missingHostSince == nil { missingHostSince = Date() }
-                let appHidden = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").first?.isHidden ?? true
+                let appHidden = hostApplication?.isHidden ?? true
                 if !appHidden && Date().timeIntervalSince(missingHostSince!) < 0.75 {
                     visible = panel.isVisible
                 } else {
@@ -180,6 +197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
         } else {
+            let levelChanged = panel.level != .floating
             panel.level = .floating
             let screen = NSScreen.main ?? NSScreen.screens[0]
             let fitted = min(model.scale, screen.visibleFrame.width / 378, screen.visibleFrame.height / 378)
@@ -187,13 +205,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             size = CGSize(width: 378 * fitted, height: 378 * fitted)
             if dragOrigin == nil {
                 let frame = WidgetPlacement.frame(host: screen.visibleFrame, visibleScreen: screen.visibleFrame, size: size, x: model.x, y: model.y)
-                panel.setFrame(frame, display: true)
+                if panel.frame != frame { panel.setFrame(frame, display: true) }
             }
-            if !panel.isVisible || panel.level != .floating { panel.orderFrontRegardless() }; visible = true; hostRect = screen.visibleFrame
+            if !panel.isVisible || levelChanged { panel.orderFrontRegardless() }; visible = true; hostRect = screen.visibleFrame
         }
         wasCodexFrontmost = codexFrontmost
-        model.writePresence(visible: visible)
-        if let diagnosticsURL {
+        if cadence.presence(now: now, visible: visible) { model.writePresence(visible: visible) }
+        if let diagnosticsURL, cadence.diagnostics(now: now) {
             let values: [String: Any] = ["visible": panel.isVisible, "followCodex": model.followCodex, "hostFound": host != nil,
                 "hostWindow": host?.1 ?? 0, "frame": NSStringFromRect(panel.frame), "quotaOK": model.snapshot.ok,
                 "queryOK": model.snapshot.queryOk ?? false, "quotaWindowCount": model.snapshot.windows.count,
