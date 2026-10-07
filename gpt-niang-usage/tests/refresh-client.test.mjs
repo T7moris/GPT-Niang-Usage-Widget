@@ -101,7 +101,11 @@ test('two actual worker startups share one writer and recover an absent GUI for 
       const child=spawn(process.execPath,[worker,configPath,'0'],{env:isolatedWorkerEnv(dir),windowsHide:true,stdio:['ignore','ignore','pipe']});
       child.stderr.on('data',data=>{errors+=data;});children.push(child);
     };
-    const options={startWorker,timeoutMs:6000,pollMs:20};
+    // Launch both contenders explicitly. A sufficiently fast first worker can
+    // become healthy before the second client checks, legitimately avoiding a
+    // second automatic startup; that is not an ownership failure.
+    startWorker();startWorker();
+    const options={startWorker:()=>{},timeoutMs:6000,pollMs:20};
     const results=await Promise.all([requestRefresh(config,configPath,options),requestRefresh(config,configPath,options)]);
     assert.equal(children.length,2);
     assert.ok(results.every(result=>result.queryOk===false && result.windows.length===0),errors);

@@ -15,6 +15,18 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(window.remaining, 0)
         XCTAssertEqual(window.resetText(at: Date(timeIntervalSince1970: 101)), "等待更新後的額度")
     }
+    func testPlanMetadataAndArbitraryQuotaWindowTitles() throws {
+        let data = Data(#"{"ok":true,"queryOk":true,"plan":"go","planLabel":"Go","windows":[{"minutes":43200,"remaining":88,"resetsAt":null}]}"#.utf8)
+        let result = try JSONDecoder().decode(UsageSnapshot.self, from: data)
+        XCTAssertEqual(result.plan, "go")
+        XCTAssertEqual(result.planLabel, "Go")
+        XCTAssertEqual(result.windows.first?.title, "30 天")
+        for (minutes, title) in [(300, "5 小時"), (10080, "每週"), (60, "1 小時"), (1440, "1 天"), (75, "75 分鐘")] {
+            XCTAssertEqual(QuotaWindow(minutes: minutes, remaining: 100).title, title)
+        }
+        let legacy = try JSONDecoder().decode(UsageSnapshot.self, from: Data(#"{"ok":true,"windows":[]}"#.utf8))
+        XCTAssertNil(legacy.plan)
+    }
     func testLocalTimeZoneAndShortCountdown() {
         let window = QuotaWindow(minutes: 10080, remaining: 75, resetsAt: 172800)
         XCTAssertEqual(window.resetText(at: Date(timeIntervalSince1970: 0), timeZone: TimeZone(secondsFromGMT: 28800)!), "1/3 08:00 重置")

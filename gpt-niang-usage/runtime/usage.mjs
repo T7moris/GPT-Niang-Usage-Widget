@@ -4,11 +4,12 @@ import {spawn} from 'node:child_process';
 import readline from 'node:readline';
 import {createHash,randomUUID} from 'node:crypto';
 import {pluginVersion} from './metadata.mjs';
+import {identifyPlan,quotaWindowLabel} from './plan.mjs';
 
 export function normalizeLimits(result, now=Date.now()) {
   const hasBuckets=result && Object.hasOwn(result,'rateLimitsByLimitId') && result.rateLimitsByLimitId!==null;
   const limit = hasBuckets ? result.rateLimitsByLimitId?.codex : result?.rateLimits;
-  if(!limit || typeof limit!=='object' || Array.isArray(limit))return {ok:false,queryOk:false,source:'official',observedAt:now,plan:null,windows:[],error:'Codex 额度接口未返回有效额度数据'};
+  if(!limit || typeof limit!=='object' || Array.isArray(limit))return {ok:false,queryOk:false,source:'official',observedAt:now,...identifyPlan(null,null),windows:[],errorCode:'INVALID_LIMITS',error:'Codex 额度接口未返回有效额度数据'};
   const windows = [];
   let invalid=false;
   for (const key of ['primary','secondary']) {
@@ -17,14 +18,13 @@ export function normalizeLimits(result, now=Date.now()) {
     const used = raw?.usedPercent;
     const reset = raw?.resetsAt;
     if(raw===null || raw===undefined)continue;
-    if(typeof raw!=='object' || !Number.isFinite(mins) || mins<=0 || typeof used!=='number' || !Number.isFinite(used) || used<0 || used>100){invalid=true;continue;}
-    if(![300,10080].includes(mins))continue;
+    if(typeof raw!=='object' || Array.isArray(raw) || !Number.isSafeInteger(mins) || mins<=0 || typeof used!=='number' || !Number.isFinite(used) || used<0 || used>100){invalid=true;continue;}
     if(windows.some(window=>window.minutes===mins)){invalid=true;continue;}
     // DateTimeOffset must also be able to represent the Beijing (+08:00) view.
-    windows.push({label:mins===300?'5 小时':'每周',minutes:mins,used,remaining:100-used,resetsAt:typeof reset==='number' && Number.isFinite(reset) && reset>0 && reset<=253402271999?reset:null});
+    windows.push({label:quotaWindowLabel(mins),minutes:mins,used,remaining:100-used,resetsAt:typeof reset==='number' && Number.isFinite(reset) && reset>0 && reset<=253402271999?reset:null});
   }
   windows.sort((a,b)=>a.minutes-b.minutes);
-  return {ok:windows.length>0,queryOk:!invalid,source:'official',observedAt:now,plan:typeof limit?.planType==='string'?limit.planType:null,windows,...(invalid?{error:'Codex 额度接口返回的窗口数据不完整'}:{})};
+  return {ok:windows.length>0,queryOk:!invalid,source:'official',observedAt:now,...identifyPlan(null,limit.planType),windows,...(invalid?{errorCode:'INVALID_WINDOWS',error:'Codex 额度接口返回的窗口数据不完整'}:windows.length===0?{errorCode:'NO_WINDOWS',error:'当前账户未提供可显示的额度窗口'}:{})};
 }
 
 // Only a fingerprint of public account/read identity fields is persisted.
@@ -79,8 +79,8 @@ export function resolveCodexExecutable(configuredPath,{env=process.env,platform=
 // Only three read-only protocol methods are sent. There is no thread or model call.
 export function readUsage(cli, {timeoutMs=18000,spawnProcess=spawn,onAccount=()=>{}}={}) {
   return new Promise(resolve=>{
-    let finished=false,proc,lines,accountKey=null,expectedId=1;
-    const failure=(error,errorCode)=>({ok:false,queryOk:false,error,windows:[],accountKey,clearPrevious:!accountKey,...(errorCode?{errorCode}:{})});
+    let finished=false,proc,lines,accountKey=null,account=null,planInfo=identifyPlan(null,null),expectedId=1;
+    const failure=(error,errorCode)=>({ok:false,queryOk:false,error,windows:[],...planInfo,accountKey,clearPrevious:!accountKey,...(errorCode?{errorCode}:{})});
     const stopChild=()=>{try{proc?.stdin.end();proc?.kill();}catch{}};
     const finish=data=>{
       if(finished)return; finished=true; clearTimeout(timer);
@@ -115,16 +115,21 @@ export function readUsage(cli, {timeoutMs=18000,spawnProcess=spawn,onAccount=()=
       } else if(m.id===2){
         if(m.error)return finish(failure('暂时无法读取登录状态'));
         const type=m.result?.account?.type;
+        account=m.result?.account;
+        planInfo=identifyPlan(account?.planType,null,type??null);
         // Account details and credentials are neither stored nor displayed.
-        if(type!=='chatgpt' && type!=='chatgptAuthTokens')return finish(failure('请在 Codex 中使用 ChatGPT 订阅登录'));
+        if(type!=='chatgpt' && type!=='chatgptAuthTokens')return finish(failure('请在 Codex 中使用 ChatGPT 账号登录（API Key 不提供订阅额度）','AUTH_MODE_UNSUPPORTED'));
         accountKey=accountFingerprint(m.result.account);
         try{onAccount(accountKey);}catch{return finish(failure('无法保存账户切换状态'));}
         expectedId=3;
         send({id:3,method:'account/rateLimits/read',params:{}});
       } else if(m.id===3){
-        if(m.error)return finish(failure('暂时无法读取额度'));
+        if(m.error)return finish(failure('暂时无法读取额度，请检查登录状态或稍后重试','RATE_LIMITS_READ_FAILED'));
         const data=normalizeLimits(m.result);
-        if(!data.ok && !data.error)data.error='当前账户未返回 5 小时或每周额度';
+        planInfo=identifyPlan(account?.planType,data.plan,account?.type);
+        Object.assign(data,planInfo);
+        const currentKey=accountFingerprint({...account,planType:data.plan});
+        if(currentKey!==accountKey){accountKey=currentKey;try{onAccount(accountKey);}catch{return finish(failure('无法保存套餐切换状态'));}}
         data.clearPrevious=(data.queryOk && !data.ok) || !accountKey;
         data.accountKey=accountKey;
         finish(data);

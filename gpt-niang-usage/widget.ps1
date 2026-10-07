@@ -89,7 +89,7 @@ public sealed class GptBezierEase:EasingFunctionBase {
 try{[GptWidgetNative]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null}catch{}
 $script:window=[Windows.Markup.XamlReader]::Parse((Get-Content -LiteralPath (Join-Path $script:appDir 'widget.xaml') -Raw -Encoding UTF8))
 $script:ui=@{}
-foreach($name in @('Root','Bubble','Tail','TailNear','SceneText','QuotaText','QuoteText','BubbleShape','Girl','PressScale','FacingScale','TextFacingScale','Header','Refresh','MenuButton','Status','LiveDot','ShortRow','WeekRow','ShortUsed','ShortLeft','ShortReset','ShortBar','WeekUsed','WeekLeft','WeekReset','WeekBar')){$script:ui[$name]=$script:window.FindName($name)}
+foreach($name in @('Root','Bubble','Tail','TailNear','SceneText','QuotaText','QuoteText','BubbleShape','Girl','PressScale','FacingScale','TextFacingScale','Header','Refresh','MenuButton','Status','LiveDot','ShortRow','WeekRow','ShortLabel','WeekLabel','ShortUsed','ShortLeft','ShortReset','ShortBar','WeekUsed','WeekLeft','WeekReset','WeekBar')){$script:ui[$name]=$script:window.FindName($name)}
 $bitmap=New-Object Windows.Media.Imaging.BitmapImage
 $bitmap.BeginInit();$bitmap.CacheOption=[Windows.Media.Imaging.BitmapCacheOption]::OnLoad
 $bitmap.UriSource=[Uri](Join-Path $script:appDir 'assets\gpt-dragon-niang-bust.png');$bitmap.EndInit();$bitmap.Freeze()
@@ -231,7 +231,8 @@ function Apply-Scene {
 function Update-BubbleTooltip {
   $copy=if($script:bubbleMode-eq 'quote'){$script:ui.QuoteText.Tag}else{
     $parts=@()
-    foreach($row in @(@{prefix='Short';label='5 小时'},@{prefix='Week';label='每周'})){
+    if($script:status.planLabel){$parts+='当前套餐：'+$script:status.planLabel}
+    foreach($row in (Get-QuotaRows)){
       if($script:ui[$row.prefix+'Row'].Visibility-ne [Windows.Visibility]::Collapsed){
         $reset=$script:ui[$row.prefix+'Reset']
         $detail=if($reset.ToolTip){[string]$reset.ToolTip}else{$reset.Text}
@@ -368,11 +369,32 @@ function Format-ResetDisplay([long]$timestamp,[long]$now){
   if($timestamp-le $now -or $script:resetTimeMode-eq 'fixed'){return Format-ResetTime $timestamp $now}
   return Reset-Label ($timestamp-$now)
 }
+function Get-QuotaWindowLabel($Window,[string]$Fallback){
+  if(!$Window){return $Fallback}
+  $minutes=[long]$Window.minutes
+  if($minutes-eq 300){return '5 小时'}
+  if($minutes-eq 10080){return '每周'}
+  if($minutes%1440-eq 0){return ([string]($minutes/1440))+' 天'}
+  if($minutes%60-eq 0){return ([string]($minutes/60))+' 小时'}
+  return ([string]$minutes)+' 分钟'
+}
+function Get-QuotaRows {
+  # Reuse the original two visual rows. A bucket has at most primary/secondary;
+  # generic windows occupy free rows, with no plan-specific duration whitelist.
+  $windows=@($script:status.windows|Where-Object{$null-ne $_}|Sort-Object minutes)
+  $short=$windows|Where-Object{$_.minutes-eq 300}|Select-Object -First 1
+  $week=$windows|Where-Object{$_.minutes-eq 10080}|Select-Object -First 1
+  $other=@($windows|Where-Object{$_.minutes-notin @(300,10080)})
+  $next=0
+  if(!$short -and $next-lt $other.Count){$short=$other[$next];$next++}
+  if(!$week -and $next-lt $other.Count){$week=$other[$next]}
+  @(@{prefix='Short';window=$short;label=(Get-QuotaWindowLabel $short '5 小时')},@{prefix='Week';window=$week;label=(Get-QuotaWindowLabel $week '每周')})
+}
 function Set-ResetTimeMode([string]$mode,[long]$nowMilliseconds){
   $script:resetTimeMode=$mode
   $now=[long][Math]::Floor($nowMilliseconds/1000)
-  foreach($row in @(@{prefix='Short';minutes=300},@{prefix='Week';minutes=10080})){
-    $q=@($script:status.windows|Where-Object{$_.minutes-eq $row.minutes})|Select-Object -First 1
+  foreach($row in (Get-QuotaRows)){
+    $q=$row.window
     if($q -and $null-ne $q.resetsAt -and [double]$q.resetsAt-gt 0){$script:ui[$row.prefix+'Reset'].Text=Format-ResetDisplay ([long]$q.resetsAt) $now}
   }
 }
@@ -383,8 +405,9 @@ function Update-Quota {
     elseif($stamp-ne $script:statusStamp){$script:status=Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json;$script:statusStamp=$stamp}
   }catch{}
   $now=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-  foreach($row in @(@{prefix='Short';minutes=300},@{prefix='Week';minutes=10080})){
-    $prefix=$row.prefix;$q=@($script:status.windows|Where-Object{$_.minutes-eq $row.minutes})|Select-Object -First 1
+  foreach($row in (Get-QuotaRows)){
+    $prefix=$row.prefix;$q=$row.window
+    $script:ui[$prefix+'Label'].Text=$row.label
     $script:ui[$prefix+'Row'].Visibility=if(!$q -and $script:status.queryOk-eq $true){[Windows.Visibility]::Collapsed}else{[Windows.Visibility]::Visible}
     $script:ui[$prefix+'Reset'].ToolTip=$null
     if(!$q){
@@ -419,6 +442,7 @@ function Update-Quota {
   $script:ui.LiveDot.Fill=[Windows.Media.BrushConverter]::new().ConvertFromString($dot)
   $script:ui.Status.ToolTip=$script:ui.Status.Text
   $script:ui.Header.Text=if(!$script:status){'正在读取'}elseif(!$script:status.ok){'暂无法读取'}elseif($script:status.error -or $age-gt 180){'上次剩余额度'}else{'剩余额度'}
+  $script:ui.Header.ToolTip=if($script:status.planLabel){'当前套餐：'+$script:status.planLabel+' · 重置时间按本机时间显示'}else{'重置时间按本机时间显示'}
   Update-BubbleTooltip
   if($script:widgetColors){Update-WidgetColorScene}
 }

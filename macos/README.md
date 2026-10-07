@@ -1,6 +1,8 @@
 # GPT 娘 macOS
 
-Current release: **1.3.0**. Chinese installation and platform comparison: [project README](../README.md#macos-安装).
+Current release: **1.3.1**. Chinese installation and platform comparison: [project README](../README.md#macos-安装).
+
+The widget detects Free, Go, Plus, Pro, Team/Business, Enterprise, Edu and future plan identifiers, and renders valid quota windows returned by Codex, including Go's 30-day window. A single window stays centered inside the original bubble. Plan labels do not determine entitlements or invent quota windows. To inspect the installed app's plan without exposing account identity or credentials, run `node /Applications/GPTNiangMac.app/Contents/Resources/Backend/runtime/detect-plan.mjs --json` after upgrading; from source, run `node gpt-niang-usage/runtime/detect-plan.mjs --json` at the repository root.
 
 A native macOS companion for the Windows GPT 娘 widget. The SwiftUI canvas ports
 v1.2.5's character image, 378-point animation stage, cloud outline, thought bubbles,
@@ -15,16 +17,18 @@ window following, native pointer capture, and menu bar entry.
 - Codex desktop installed and signed in with a ChatGPT account.
 - Source builds only: Xcode command-line tools / Swift 5.9 or newer. The release app does not need Xcode or Swift.
 
+If a CommandLineTools-only source build reports a missing SwiftUI macro plugin, `GPT_NIANG_SDK=/path/to/compatible/MacOSX.sdk ./script/build_and_run.sh --build-only` forwards the selected SDK to Swift. The default build and deployment target are unchanged. This build compatibility change is retained from [PR #8](https://github.com/T7moris/GPT-Niang-Usage-Widget/pull/8).
+
 ## Install the release
 
-Download `gpt-niang-usage-widget-v1.3.0-macos-universal.zip` from the [GitHub Release](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest), verify its entry in `SHA256SUMS.txt`, unzip, and move `GPTNiangMac.app` to Applications before opening. Node.js 20+ and a signed-in Codex desktop app are required; Swift/Xcode is needed only for source builds.
+Download `gpt-niang-usage-widget-v1.3.1-macos-universal.zip` from the [GitHub Release](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest), verify its entry in `SHA256SUMS.txt`, unzip, and move `GPTNiangMac.app` to Applications before opening. Node.js 20+ and a signed-in Codex desktop app are required; Swift/Xcode is needed only for source builds.
 
 The release is ad-hoc signed, not Developer ID signed or notarized. If macOS blocks the first launch, after checking the source and checksum follow [Apple’s instructions](https://support.apple.com/102445) in System Settings → Privacy & Security → Open Anyway.
 
 To calculate the downloaded ZIP’s checksum in Terminal, change to the download directory and run:
 
 ```sh
-shasum -a 256 gpt-niang-usage-widget-v1.3.0-macos-universal.zip
+shasum -a 256 gpt-niang-usage-widget-v1.3.1-macos-universal.zip
 ```
 
 Compare the result with the same filename in `SHA256SUMS.txt`; hexadecimal letter case does not matter.

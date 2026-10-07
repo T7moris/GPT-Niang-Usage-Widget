@@ -5,6 +5,7 @@
 - `Install.ps1`：检查依赖并安装；`-CheckOnly` 只检查，不修改系统。
 - `widget.ps1` / `widget.xaml`：Windows WPF 挂件与界面。
 - `runtime/mcp.mjs`：Windows 插件的只读额度查询工具。
+- `runtime/plan.mjs` / `runtime/detect-plan.mjs`：自动识别套餐并检测实际额度窗口；根目录「检测套餐.cmd」可直接运行。
 - `runtime/watch.mjs` / `runtime/worker-state.mjs`：双平台共享的额度刷新与单实例 worker。
 - `runtime/thread-speed.mjs`：Mac 聊天速度面板的本地计数 helper，不代表实时模型速度。
 - `runtime/supervisor.ps1`：识别主窗口并自动恢复角色。

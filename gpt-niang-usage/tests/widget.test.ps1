@@ -8,7 +8,7 @@ $tokens=$null;$parseErrors=$null
 $source=[IO.File]::ReadAllText((Join-Path $appDir 'widget.ps1'),[Text.Encoding]::UTF8)
 $ast=[Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$parseErrors)
 if($parseErrors.Count){throw ($parseErrors|Out-String)}
-foreach($name in @('Reset-Label','Format-ResetTime','Format-ResetDisplay','Set-ResetTimeMode','Restart-SceneTtl','Tick-Scene','Apply-Scene','Update-BubbleTooltip','Update-Quota')){
+foreach($name in @('Reset-Label','Format-ResetTime','Format-ResetDisplay','Get-QuotaWindowLabel','Get-QuotaRows','Set-ResetTimeMode','Restart-SceneTtl','Tick-Scene','Apply-Scene','Update-BubbleTooltip','Update-Quota')){
   $definition=$ast.Find({param($node)$node-is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name-eq $name},$true)
   . ([ScriptBlock]::Create($definition.Extent.Text))
 }
@@ -17,7 +17,7 @@ $script:dataDir=Join-Path ([IO.Path]::GetTempPath()) ('gpt-niang-widget-test-'+[
 $null=New-Item -ItemType Directory -Path $script:dataDir
 $script:window=[Windows.Markup.XamlReader]::Parse([IO.File]::ReadAllText((Join-Path $appDir 'widget.xaml'),[Text.Encoding]::UTF8))
 $script:ui=@{}
-foreach($name in @('Root','Girl','Bubble','SceneText','QuotaText','Refresh','ShortRow','WeekRow','ShortUsed','ShortLeft','ShortReset','ShortBar','WeekUsed','WeekLeft','WeekReset','WeekBar','Status','LiveDot','Header','QuoteText')){$script:ui[$name]=$script:window.FindName($name)}
+foreach($name in @('Root','Girl','Bubble','SceneText','QuotaText','Refresh','ShortRow','WeekRow','ShortLabel','WeekLabel','ShortUsed','ShortLeft','ShortReset','ShortBar','WeekUsed','WeekLeft','WeekReset','WeekBar','Status','LiveDot','Header','QuoteText')){$script:ui[$name]=$script:window.FindName($name)}
 $script:ui.Girl.Source=[Windows.Media.Imaging.BitmapImage]::new([Uri](Join-Path $appDir 'assets\gpt-dragon-niang-bust.png'))
 $script:bubbleMode='quota';$script:status=$null;$script:statusStamp=0
 $script:resetTimeMode='fixed';$script:resetPhaseTimer=$null;$script:collapsed=$true;$script:closeCount=0
@@ -229,6 +229,27 @@ try{
     Assert-QuotaLayout
   }
 
+  foreach($single in @(
+    @{minutes=43200;used=12;remaining=88;resetsAt=[Math]::Floor($now/1000)+2592000;label='30 天'},
+    @{minutes=1440;used=80;remaining=20;resetsAt=$null;label='1 天'},
+    @{minutes=75;used=0;remaining=100;resetsAt=$null;label='75 分钟'}
+  )){
+    Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel='Go';windows=@($single)}
+    Assert-Equal $script:ui.ShortLabel.Text $single.label 'Generic duration label'
+    Assert-Equal $script:ui.ShortLeft.Text ($single.remaining.ToString()+'%') 'Generic duration percentage'
+    Assert-Equal $script:ui.WeekRow.Visibility Collapsed 'One actual window hides the unused row'
+    Assert-QuotaLayout
+    $scene=$script:ui.SceneText;$quota=$script:ui.QuotaText
+    $origin=$quota.TranslatePoint([Windows.Point]::new(0,0),$scene)
+    if([Math]::Abs($origin.Y+$quota.ActualHeight/2-$scene.ActualHeight/2)-gt 0.5){throw 'Single-window quota content is not vertically centered'}
+    if(!$script:bubbleTooltipText.Text.Contains('当前套餐：Go')){throw 'Plan metadata missing from tooltip'}
+    Save-Preview ('single-'+$single.minutes)
+  }
+  Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel='Pro';windows=@(@{minutes=60;used=95;remaining=5;resetsAt=$null},@{minutes=43200;used=20;remaining=80;resetsAt=$null})}
+  Assert-Equal $script:ui.ShortLabel.Text '1 小时' 'First generic row'
+  Assert-Equal $script:ui.WeekLabel.Text '30 天' 'Second generic row'
+  Assert-QuotaLayout
+  Save-Preview 'pro-generic-two-windows'
   Remove-Item -LiteralPath (Join-Path $script:dataDir 'status.json')
   Update-Quota
   Assert-Equal $script:status $null 'Removed snapshot is cleared'

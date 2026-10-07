@@ -2,7 +2,7 @@
 
 让一只白发紫瞳的小龙娘，陪你看 Codex 的剩余额度。
 
-**Windows / macOS 桌面挂件 · 5 小时 / 每周额度 · 中文语录 · 当前版本 1.3.0**
+**Windows / macOS 桌面挂件 · 自动识别套餐与额度窗口 · 中文语录 · 当前版本 1.3.1**
 
 [**下载最新版**](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest) · [Windows 安装](#windows-安装) · [macOS 安装](#macos-安装) · [更新记录](更新记录.md) · [反馈问题](https://github.com/T7moris/GPT-Niang-Usage-Widget/issues/new)
 
@@ -10,7 +10,7 @@
 
 ## 能做什么
 
-- **点角色看额度**：按接口实际返回的窗口显示 5 小时或每周剩余百分比；横条越满，剩余额度越多。成功查询时折叠未返回的整条窗口；查询失败会显示异常，重置时间为空时仍保留百分比。
+- **点角色看额度**：按接口实际返回的窗口显示剩余百分比，例如 5 小时、每周、30 天；单个窗口在原气泡内居中，横条越满，剩余额度越多。成功查询时折叠未返回的整条窗口；查询失败会显示异常，重置时间为空时仍保留百分比。
 - **点气泡看语录**：再点收起，显示完成约 5 秒后也会自动收起；支持编辑自己的语录。
 - **按压与回弹**：半身角色、分段气泡动画和轻提示音，可调整音量或静音。
 - **拖动与缩放**：靠近左右边缘吸附，角色面向窗口内侧，文字保持正向。
@@ -20,16 +20,36 @@
 
 这是独立的桌面挂件；Windows 同时提供额度查询插件，Mac 为原生应用，不注册 MCP 插件。它读取当前 Codex 登录账户的额度，**不会为读取额度创建聊天或调用模型**。它不是 OpenAI 或 DeepSeek 的官方项目。
 
+## 套餐适配与自动检测
+
+Windows 与 macOS 共用按实际返回值解析的后端。自动识别 Free、Go、Plus、Pro、Team、Business、Enterprise、Edu；遇到未来套餐保留其标识。**套餐名称不决定显示哪些窗口，也不代表额外授予接口权限**。Go 的 30 天窗口是 `43200` 分钟；其他合法时长也会显示为小时、天或分钟，不再被白名单过滤。两个平台保留原来的气泡外观、单行居中、刷新、重置时间和动画行为。
+
+Windows 双击根目录 `检测套餐.cmd`，或执行 `powershell.exe -NoProfile -File .\gpt-niang-usage\Detect-Plan.ps1 -Json`。从源码检查 Windows / macOS 均可执行：
+
+```sh
+node gpt-niang-usage/runtime/detect-plan.mjs --json
+```
+
+Mac 已安装应用也可执行（将应用路径替换为自己的安装位置）：
+
+```sh
+node /Applications/GPTNiangMac.app/Contents/Resources/Backend/runtime/detect-plan.mjs --json
+```
+
+脚本通过同一套只读 `account/read` 与 `account/rateLimits/read` 自动读取套餐标识，优先使用额度桶中的 `planType`，未提供时使用账号返回的套餐；不读取或输出令牌、邮箱和聊天。切换套餐后下一次刷新会重新识别，套餐变化会使旧快照失效。API Key 登录、未登录、接口查询失败和成功但没有额度窗口会分别提示，成功但没有窗口不被当成网络错误。
+
+[PR #8](https://github.com/T7moris/GPT-Niang-Usage-Widget/pull/8) 的 Go 实测表明原接口已经成功返回 30 天窗口，原后端的 `[300,10080]` 白名单和 Windows 固定按分钟数查找两行才是显示失败的原因。切换套餐可能改变 `planType`、窗口时长、窗口数量和重置时刻；额度读取方法仍是同一个。实际 HTTP／登录错误应根据返回错误单独检查，不能仅凭套餐名称判断。协议字段见 [OpenAI App Server 文档](https://learn.chatgpt.com/docs/app-server)。
+
 ## 安装
 
 两边都需要 **Node.js 20 或更新版本**，以及已安装并用 ChatGPT 账号登录的 **Codex 桌面端**。下载包不附带 Node.js；缺少时请先从 [Node.js 官方网站](https://nodejs.org/) 安装。
 
 在 [Release 下载页](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/latest) 的 **Assets** 中选择自己的系统：
 
-| 系统 | v1.3.0 安装包 | 安装入口 |
+| 系统 | v1.3.1 安装包 | 安装入口 |
 | --- | --- | --- |
-| Windows 10 / 11 | [gpt-niang-usage-widget-v1.3.0-windows.zip](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/download/v1.3.0/gpt-niang-usage-widget-v1.3.0-windows.zip) | 解压后运行 `安装GPT娘.cmd` |
-| macOS 13+，Apple Silicon / Intel | [gpt-niang-usage-widget-v1.3.0-macos-universal.zip](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/download/v1.3.0/gpt-niang-usage-widget-v1.3.0-macos-universal.zip) | 解压后打开 `GPTNiangMac.app` |
+| Windows 10 / 11 | [gpt-niang-usage-widget-v1.3.1-windows.zip](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/download/v1.3.1/gpt-niang-usage-widget-v1.3.1-windows.zip) | 解压后运行 `安装GPT娘.cmd` |
+| macOS 13+，Apple Silicon / Intel | [gpt-niang-usage-widget-v1.3.1-macos-universal.zip](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/download/v1.3.1/gpt-niang-usage-widget-v1.3.1-macos-universal.zip) | 解压后打开 `GPTNiangMac.app` |
 
 GitHub 自动附带的 **Source code** 和 **Code → Download ZIP** 是源码，不是上述安装包。Mac 下载包内已包含通用应用，不需要 Swift 或 Xcode；Intel 和较旧 macOS 的实际界面表现仍需真机验证。尚无 Linux 版本。
 
@@ -54,18 +74,18 @@ Mac 的位置跟随目标为 60 Hz，仍使用轮询，不能保证拖动时零�
 
 ### 安装包校验（建议）
 
-同一 [v1.3.0 Release](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/tag/v1.3.0) 的 **[SHA256SUMS.txt](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/download/v1.3.0/SHA256SUMS.txt)** 包含两个包的校验值。下载后计算自己的安装包哈希，与文件中**同名文件**的一行比较。
+同一 [v1.3.1 Release](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/tag/v1.3.1) 的 **[SHA256SUMS.txt](https://github.com/T7moris/GPT-Niang-Usage-Widget/releases/download/v1.3.1/SHA256SUMS.txt)** 包含两个包的校验值。下载后计算自己的安装包哈希，与文件中**同名文件**的一行比较。
 
 Windows，在 PowerShell 中运行：
 
 ```powershell
-Get-FileHash .\gpt-niang-usage-widget-v1.3.0-windows.zip -Algorithm SHA256
+Get-FileHash .\gpt-niang-usage-widget-v1.3.1-windows.zip -Algorithm SHA256
 ```
 
 macOS，在终端中进入下载目录后运行：
 
 ```sh
-shasum -a 256 gpt-niang-usage-widget-v1.3.0-macos-universal.zip
+shasum -a 256 gpt-niang-usage-widget-v1.3.1-macos-universal.zip
 ```
 
 十六进制字母大小写不影响比较。哈希不一致说明下载文件与 Release 校验值不一致，可能是下载损坏或内容被改动，请不要安装。请只从本仓库的 Release 页面下载；第三方加速镜像不能当作可信来源。

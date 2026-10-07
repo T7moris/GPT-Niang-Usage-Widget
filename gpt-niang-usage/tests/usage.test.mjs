@@ -15,7 +15,7 @@ test('missing current bucket does not borrow a different account or meter',()=>{
   assert.equal(normalizeLimits({rateLimits:{primary:w()},rateLimitsByLimitId:{other:{primary:w()}}}).ok,false);
 });
 test('missing and invalid fields stay unavailable, valid zero and full usage survive',()=>{
-  for(const x of [null,{}, {usedPercent:null,windowDurationMins:300,resetsAt:2000000000},w(-1),w(101),w(NaN),w(5,60)])assert.equal(normalizeLimits({rateLimits:{primary:x}}).ok,false);
+  for(const x of [null,{}, {usedPercent:null,windowDurationMins:300,resetsAt:2000000000},w(-1),w(101),w(NaN),w(5,0),w(5,1.5),w(5,Number.MAX_SAFE_INTEGER+1)])assert.equal(normalizeLimits({rateLimits:{primary:x}}).ok,false);
   assert.equal(normalizeLimits({rateLimits:{primary:w(0)}}).windows[0].remaining,100);
   assert.equal(normalizeLimits({rateLimits:{primary:w(100)}}).windows[0].remaining,0);
 });
