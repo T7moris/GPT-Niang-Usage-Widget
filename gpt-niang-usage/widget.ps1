@@ -88,6 +88,9 @@ public sealed class GptBezierEase:EasingFunctionBase {
 '@ -ReferencedAssemblies ([Windows.Media.Animation.EasingFunctionBase].Assembly.Location),([Windows.Freezable].Assembly.Location)
 try{[GptWidgetNative]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null}catch{}
 $script:window=[Windows.Markup.XamlReader]::Parse((Get-Content -LiteralPath (Join-Path $script:appDir 'widget.xaml') -Raw -Encoding UTF8))
+# Capture the unscaled XAML canvas before native resizing changes Window.Width/Height.
+$script:designWidth=[double]$script:window.FindName('AnimationStage').Width
+$script:designHeight=[double]$script:window.FindName('AnimationStage').Height
 $script:ui=@{}
 foreach($name in @('Root','Bubble','Tail','TailNear','SceneText','QuotaText','QuoteText','BubbleShape','Girl','PressScale','FacingScale','TextFacingScale','Header','Refresh','MenuButton','Status','LiveDot','ShortRow','WeekRow','ShortLabel','WeekLabel','ShortUsed','ShortLeft','ShortReset','ShortBar','WeekUsed','WeekLeft','WeekReset','WeekBar')){$script:ui[$name]=$script:window.FindName($name)}
 $bitmap=New-Object Windows.Media.Imaging.BitmapImage
@@ -140,12 +143,12 @@ function Set-Appearance {
   $actual=$script:scale
   if($script:hostHandle -and $script:hostHandle-ne [IntPtr]::Zero -and [GptWidgetNative]::IsWindow($script:hostHandle)){
     $frame=[GptWidgetNative]::Frame($script:hostHandle);$dpi=[GptWidgetNative]::GetDpiForWindow($script:hostHandle)/96.0
-    if($dpi-gt 0 -and $frame.Right-gt $frame.Left -and $frame.Bottom-gt $frame.Top){$actual=[Math]::Min($actual,[Math]::Min(($frame.Right-$frame.Left)/$dpi/378,($frame.Bottom-$frame.Top)/$dpi/378))}
+    if($dpi-gt 0 -and $frame.Right-gt $frame.Left -and $frame.Bottom-gt $frame.Top){$actual=[Math]::Min($actual,[Math]::Min(($frame.Right-$frame.Left)/$dpi/$script:designWidth,($frame.Bottom-$frame.Top)/$dpi/$script:designHeight))}
   }
   $script:displayScale=$actual
   # Transparent space around the original 350px pose contains press/rebound
   # overshoot without shrinking the character or exposing a rectangular cut.
-  $script:window.Width=378*$actual;$script:window.Height=378*$actual
+  $script:window.Width=$script:designWidth*$actual;$script:window.Height=$script:designHeight*$actual
   # The Viewbox scales the completed pose, including the mirror origin and press motion.
   # Scaling and mirroring this same Canvas made its origin escape the native window.
   $script:ui.Root.LayoutTransform=[Windows.Media.Transform]::Identity
@@ -451,8 +454,8 @@ if($CheckOnly){$hostWindow=[GptWidgetNative]::FindCodex();$foregroundWindow=[Gpt
 if($Preview){
   $script:collapsed=$false;Set-Appearance;Set-BubbleState;Apply-Scene
   $script:ui.Root.LayoutTransform=[Windows.Media.Transform]::Identity
-  $root=$script:window.FindName('AnimationStage');$root.Measure([Windows.Size]::new(378,378));$root.Arrange([Windows.Rect]::new(0,0,378,378));$root.UpdateLayout()
-  $render=New-Object Windows.Media.Imaging.RenderTargetBitmap(378,378,96,96,[Windows.Media.PixelFormats]::Pbgra32)
+  $root=$script:window.FindName('AnimationStage');$root.Measure([Windows.Size]::new($script:designWidth,$script:designHeight));$root.Arrange([Windows.Rect]::new(0,0,$script:designWidth,$script:designHeight));$root.UpdateLayout()
+  $render=New-Object Windows.Media.Imaging.RenderTargetBitmap($script:designWidth,$script:designHeight,96,96,[Windows.Media.PixelFormats]::Pbgra32)
   $render.Render($root);$encoder=New-Object Windows.Media.Imaging.PngBitmapEncoder
   $encoder.Frames.Add([Windows.Media.Imaging.BitmapFrame]::Create($render))
   $stream=[IO.File]::Create((Join-Path $script:appDir 'preview.png'));try{$encoder.Save($stream)}finally{$stream.Dispose()};return
@@ -516,7 +519,7 @@ $pressMove={param($sender,$event)
   if($script:hostHandle-eq [IntPtr]::Zero){return}
   $frame=[GptWidgetNative]::Frame($script:hostHandle);$dpi=[GptWidgetNative]::GetDpiForWindow($script:hostHandle)/96.0
   if($dpi-le 0){$dpi=1}
-  $w=[int]($script:window.Width*$dpi);$h=[int]($script:window.Height*$dpi)
+  $w=[int]($script:designWidth*$script:displayScale*$dpi);$h=[int]($script:designHeight*$script:displayScale*$dpi)
   $x=[int][Math]::Max($frame.Left,[Math]::Min($frame.Right-$w,$script:drag.left+$dx))
   $y=[int][Math]::Max($frame.Top,[Math]::Min($frame.Bottom-$h,$script:drag.top+$dy))
   [GptWidgetNative]::SetWindowPos($script:widgetHandle,[IntPtr]::Zero,$x,$y,$w,$h,0x14)|Out-Null
@@ -609,9 +612,9 @@ function Tick-Widget {
     if(!$script:drag){
       $frame=[GptWidgetNative]::Frame($script:hostHandle);$dpi=[GptWidgetNative]::GetDpiForWindow($script:hostHandle)/96.0
       if($dpi-le 0){$dpi=1}
-      $fitted=[Math]::Min($script:scale,[Math]::Min(($frame.Right-$frame.Left)/$dpi/378,($frame.Bottom-$frame.Top)/$dpi/378))
+      $fitted=[Math]::Min($script:scale,[Math]::Min(($frame.Right-$frame.Left)/$dpi/$script:designWidth,($frame.Bottom-$frame.Top)/$dpi/$script:designHeight))
       if([Math]::Abs($script:displayScale-$fitted)-gt 0.001){Set-Appearance}
-      $w=[int]($script:window.Width*$dpi);$h=[int]($script:window.Height*$dpi)
+      $w=[int]($script:designWidth*$script:displayScale*$dpi);$h=[int]($script:designHeight*$script:displayScale*$dpi)
       if($script:anchor-eq 'left'){$x=[int]($frame.Left+$script:offsetLeft*$dpi)}
       elseif($script:anchor-eq 'free'){
         if($null-eq $script:offsetLeft){$script:offsetLeft=[Math]::Max(0,($frame.Right-$frame.Left-$w)/$dpi-$script:offsetRight)}
