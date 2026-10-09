@@ -6,6 +6,28 @@ import {createHash,randomUUID} from 'node:crypto';
 import {pluginVersion} from './metadata.mjs';
 import {identifyPlan,quotaWindowLabel} from './plan.mjs';
 
+const resetTime=value=>typeof value==='number' && Number.isFinite(value) && value>0 && value<=253402271999?value:null;
+function quotaAmount(value) {
+  // The service returns decimal strings for credit amounts, not currency.
+  if(typeof value==='string' && !/^\d+(?:\.\d+)?$/.test(value.trim()))return null;
+  if(typeof value!=='number' && typeof value!=='string')return null;
+  const number=Number(value);
+  return Number.isFinite(number) && number>=0?number:null;
+}
+function normalizeIndividual(raw) {
+  if(!raw || typeof raw!=='object' || Array.isArray(raw))return null;
+  const total=quotaAmount(raw.limit),amountUsed=quotaAmount(raw.used);
+  const supplied=raw.remainingPercent;
+  // Prefer the service's rounded percentage; derive only when it is absent.
+  const remaining=supplied==null
+    ?(total>0 && amountUsed!==null?Math.max(0,100*(1-amountUsed/total)):null)
+    :(typeof supplied==='number' && Number.isFinite(supplied) && supplied>=0 && supplied<=100?supplied:null);
+  if(remaining===null)return null;
+  return {kind:'individual',label:'个人额度',minutes:null,used:100-remaining,remaining,
+    resetsAt:resetTime(raw.resetsAt),total,amountUsed,
+    amountRemaining:total!==null && amountUsed!==null?Math.max(0,total-amountUsed):null};
+}
+
 export function normalizeLimits(result, now=Date.now()) {
   const hasBuckets=result && Object.hasOwn(result,'rateLimitsByLimitId') && result.rateLimitsByLimitId!==null;
   const limit = hasBuckets ? result.rateLimitsByLimitId?.codex : result?.rateLimits;
@@ -21,9 +43,13 @@ export function normalizeLimits(result, now=Date.now()) {
     if(typeof raw!=='object' || Array.isArray(raw) || !Number.isSafeInteger(mins) || mins<=0 || typeof used!=='number' || !Number.isFinite(used) || used<0 || used>100){invalid=true;continue;}
     if(windows.some(window=>window.minutes===mins)){invalid=true;continue;}
     // DateTimeOffset must also be able to represent the Beijing (+08:00) view.
-    windows.push({label:quotaWindowLabel(mins),minutes:mins,used,remaining:100-used,resetsAt:typeof reset==='number' && Number.isFinite(reset) && reset>0 && reset<=253402271999?reset:null});
+    windows.push({label:quotaWindowLabel(mins),minutes:mins,used,remaining:100-used,resetsAt:resetTime(reset)});
   }
   windows.sort((a,b)=>a.minutes-b.minutes);
+  if(limit.individualLimit!=null){
+    const individual=normalizeIndividual(limit.individualLimit);
+    if(individual)windows.unshift(individual);else invalid=true;
+  }
   return {ok:windows.length>0,queryOk:!invalid,source:'official',observedAt:now,...identifyPlan(null,limit.planType),windows,...(invalid?{errorCode:'INVALID_WINDOWS',error:'Codex 额度接口返回的窗口数据不完整'}:windows.length===0?{errorCode:'NO_WINDOWS',error:'当前账户未提供可显示的额度窗口'}:{})};
 }
 

@@ -32,11 +32,15 @@
       <Path x:Name="BubbleShape" Fill="#FFFFFF" Stroke="#745A98" StrokeThickness="4"
             StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
             Data="M 283,85 A 128,79 0 1 0 27,85 A 128,79 0 0 0 114,160 A 20,10 0 0 0 149,164 A 128,79 0 0 0 283,85 Z"/>
-      <Grid x:Name="SceneText" Canvas.Left="63" Canvas.Top="22" Width="184" Height="115" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
+      <Grid x:Name="SceneText" Canvas.Left="63" Canvas.Top="22" Width="184" Height="115" RenderTransformOrigin="0.5,0.5">
         <Grid.RenderTransform><ScaleTransform x:Name="TextFacingScale"/></Grid.RenderTransform>
       <StackPanel x:Name="QuotaText" VerticalAlignment="Center">
-        <TextBlock x:Name="Header" Text="剩余额度" HorizontalAlignment="Center" FontSize="12" LineHeight="16" LineStackingStrategy="BlockLineHeight" FontWeight="SemiBold" Foreground="#7D6B91" ToolTip="重置时间按当前机器的本地时间显示"/>
-        <StackPanel x:Name="ShortRow" Margin="0,1,0,0">
+        <Grid x:Name="HeaderRow" Height="16">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="24"/></Grid.ColumnDefinitions>
+          <TextBlock x:Name="Header" Text="剩余额度" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="160" TextAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" FontSize="12" LineHeight="16" LineStackingStrategy="BlockLineHeight" FontWeight="SemiBold" Foreground="#7D6B91" IsHitTestVisible="False" ToolTip="重置时间按当前机器的本地时间显示"/>
+          <Button x:Name="Refresh" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Width="20" Height="16" Content="↻" FontSize="12" ToolTip="立即刷新额度"/>
+        </Grid>
+        <StackPanel x:Name="ShortRow" Margin="0,1,0,0" IsHitTestVisible="False">
         <Grid Height="25">
           <TextBlock x:Name="ShortLabel" Text="5 小时" FontSize="13" VerticalAlignment="Center" Foreground="#76638D"/>
           <TextBlock x:Name="ShortLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Segoe UI" FontSize="24" LineHeight="25" LineStackingStrategy="BlockLineHeight" FontWeight="Bold" Foreground="#745A98"/>
@@ -47,7 +51,7 @@
         <TextBlock x:Name="ShortReset" Text="等待额度数据" Margin="0,1,0,0" FontSize="12" LineHeight="15" LineStackingStrategy="BlockLineHeight" Foreground="#7D6B91"/>
         <TextBlock x:Name="ShortUsed" Visibility="Collapsed" Text="已用 —"/>
         </StackPanel>
-        <StackPanel x:Name="WeekRow" Margin="0,4,0,0">
+        <StackPanel x:Name="WeekRow" Margin="0,4,0,0" IsHitTestVisible="False">
         <Grid Height="25">
           <TextBlock x:Name="WeekLabel" Text="每周" FontSize="13" VerticalAlignment="Center" Foreground="#76638D"/>
           <TextBlock x:Name="WeekLeft" Text="—" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Segoe UI" FontSize="24" LineHeight="25" LineStackingStrategy="BlockLineHeight" FontWeight="Bold" Foreground="#745A98"/>
@@ -60,10 +64,9 @@
         </StackPanel>
         <TextBlock x:Name="Status" Visibility="Collapsed" Text="正在读取额度…"/>
       </StackPanel>
-        <TextBlock x:Name="QuoteText" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="20" FontWeight="Bold" LineHeight="25" Foreground="#745A98" Text="我在这儿，慢慢来就好。"/>
+        <TextBlock x:Name="QuoteText" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="20" FontWeight="Bold" LineHeight="25" Foreground="#745A98" IsHitTestVisible="False" Text="我在这儿，慢慢来就好。"/>
       </Grid>
     <Ellipse x:Name="LiveDot" Visibility="Collapsed" Canvas.Left="134" Canvas.Top="17" Width="4" Height="4" Fill="#9B86C1" IsHitTestVisible="False"/>
-      <Button x:Name="Refresh" Canvas.Left="184" Canvas.Top="20" Width="20" Height="20" Content="↻" FontSize="14" ToolTip="立即刷新额度"/>
     </Canvas>
     <Ellipse x:Name="Tail" Canvas.Left="108" Canvas.Top="182" Width="25" Height="18" Fill="#FFFFFF" Stroke="#745A98" StrokeThickness="4" RenderTransformOrigin="0.5,0.5">
       <Ellipse.RenderTransform><ScaleTransform/></Ellipse.RenderTransform>

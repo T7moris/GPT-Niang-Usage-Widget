@@ -45,6 +45,7 @@ public static class GptWidgetNative {
   [DllImport("user32.dll",EntryPoint="GetWindowLongPtrW")] public static extern IntPtr GetWindowLongPtr(IntPtr h,int i);
   [DllImport("user32.dll",EntryPoint="SetWindowLongPtrW")] public static extern IntPtr SetWindowLongPtr(IntPtr h,int i,IntPtr v);
   [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr context);
+  [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
   [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h,int attr,out Rect r,int size);
   public static Rect Frame(IntPtr h){Rect r; if(DwmGetWindowAttribute(h,9,out r,16)!=0)GetWindowRect(h,out r); return r;}
   public static bool MainWindowStyle(long style,long extended){
@@ -86,7 +87,12 @@ public sealed class GptBezierEase:EasingFunctionBase {
   protected override Freezable CreateInstanceCore(){return new GptBezierEase{X1=X1,Y1=Y1,X2=X2,Y2=Y2};}
 }
 '@ -ReferencedAssemblies ([Windows.Media.Animation.EasingFunctionBase].Assembly.Location),([Windows.Freezable].Assembly.Location)
-try{[GptWidgetNative]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null}catch{}
+try{
+  [GptWidgetNative]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null
+  # PowerShell may already have a process DPI context. Set the UI thread too,
+  # so DWM, GetWindowRect and SetWindowPos all use physical screen pixels.
+  [GptWidgetNative]::SetThreadDpiAwarenessContext([IntPtr](-4)) | Out-Null
+}catch{}
 $script:window=[Windows.Markup.XamlReader]::Parse((Get-Content -LiteralPath (Join-Path $script:appDir 'widget.xaml') -Raw -Encoding UTF8))
 $script:ui=@{}
 foreach($name in @('Root','Bubble','Tail','TailNear','SceneText','QuotaText','QuoteText','BubbleShape','Girl','PressScale','FacingScale','TextFacingScale','Header','Refresh','MenuButton','Status','LiveDot','ShortRow','WeekRow','ShortLabel','WeekLabel','ShortUsed','ShortLeft','ShortReset','ShortBar','WeekUsed','WeekLeft','WeekReset','WeekBar')){$script:ui[$name]=$script:window.FindName($name)}
@@ -131,15 +137,15 @@ function Save-Settings {Write-WidgetJson $settingsFile @{layoutVersion=2;right=$
 function Set-Facing {
   $factor=if($script:side-eq 'left'){-1.0}else{1.0}
   $script:ui.FacingScale.ScaleX=$factor;$script:ui.TextFacingScale.ScaleX=$factor
-  $script:ui.Refresh.RenderTransformOrigin=[Windows.Point]::new(0.5,0.5)
-  $script:ui.Refresh.RenderTransform=[Windows.Media.ScaleTransform]::new($factor,1)
+  # Refresh now shares SceneText's mirror compensation with the title.
+  $script:ui.Refresh.RenderTransform=[Windows.Media.Transform]::Identity
   $script:ui.MenuButton.RenderTransformOrigin=[Windows.Point]::new(0.5,0.5)
   $script:ui.MenuButton.RenderTransform=[Windows.Media.ScaleTransform]::new($factor,1)
 }
 function Set-Appearance {
   $actual=$script:scale
   if($script:hostHandle -and $script:hostHandle-ne [IntPtr]::Zero -and [GptWidgetNative]::IsWindow($script:hostHandle)){
-    $frame=[GptWidgetNative]::Frame($script:hostHandle);$dpi=[GptWidgetNative]::GetDpiForWindow($script:hostHandle)/96.0
+    $frame=Get-WidgetVisibleFrame;$dpi=[GptWidgetNative]::GetDpiForWindow($script:hostHandle)/96.0
     if($dpi-gt 0 -and $frame.Right-gt $frame.Left -and $frame.Bottom-gt $frame.Top){$actual=[Math]::Min($actual,[Math]::Min(($frame.Right-$frame.Left)/$dpi/378,($frame.Bottom-$frame.Top)/$dpi/378))}
   }
   $script:displayScale=$actual
@@ -152,6 +158,26 @@ function Set-Appearance {
   Set-Facing
   $script:lastPosition=$null
   if($script:hostEventTimer -and !$script:hostEventTimer.IsEnabled){$script:hostEventTimer.Start()}
+}
+function Get-WidgetVisibleFrame {
+  $frame=[GptWidgetNative]::Frame($script:hostHandle)
+  $bounds=[GptWidgetHostFollower]::VisibleBounds($script:hostHandle,$frame.Left,$frame.Top,$frame.Right,$frame.Bottom)
+  $frame.Left=$bounds[0];$frame.Top=$bounds[1];$frame.Right=$bounds[2];$frame.Bottom=$bounds[3]
+  return $frame
+}
+function Set-WidgetPixelSize([double]$dpi){
+  # Never feed Window.Width back into a native resize: WM_SIZE writes it back
+  # in WPF DIPs, which need not match the host's DPI on mixed-scale monitors.
+  $pixels=378*$script:displayScale*$dpi
+  $source=[Windows.PresentationSource]::FromVisual($script:window)
+  $sx=1.0;$sy=1.0
+  if($source -and $source.CompositionTarget){
+    $matrix=$source.CompositionTarget.TransformToDevice;$sx=$matrix.M11;$sy=$matrix.M22
+  }
+  $width=$pixels/$sx;$height=$pixels/$sy
+  if([Math]::Abs($script:window.Width-$width)-gt 0.01){$script:window.Width=$width}
+  if([Math]::Abs($script:window.Height-$height)-gt 0.01){$script:window.Height=$height}
+  return [int][Math]::Round($pixels)
 }
 function Set-AnimatedValue($target,$property,[double]$value) {
   $target.BeginAnimation($property,$null);$target.SetValue($property,$value)
@@ -237,7 +263,21 @@ function Update-BubbleTooltip {
         $reset=$script:ui[$row.prefix+'Reset']
         $detail=if($reset.ToolTip){[string]$reset.ToolTip}else{$reset.Text}
         $parts+="$($row.label)：$($script:ui[$row.prefix+'Used'].Text)，$detail"
+        if($row.window.kind-eq 'individual'){
+          $q=$row.window;$parts+='公司工作区内的个人限额（非公司总余额）'
+          if($null-ne $q.total -and $null-ne $q.amountUsed){
+            $parts+='额度上限 '+([double]$q.total).ToString('0.##')+' · 已用 '+([double]$q.amountUsed).ToString('0.##')+' · 剩余 '+([double]$q.amountRemaining).ToString('0.##')
+          }
+        }
       }
+    }
+    # If an individual cap coexists with both timed windows, the second row
+    # shows the most restrictive timed window; retain all others in the tooltip.
+    $shown=@((Get-QuotaRows)|ForEach-Object{$_.window})
+    foreach($q in @($script:status.windows|Where-Object{$null-ne $_ -and $_ -notin $shown})){
+      $label=Get-QuotaWindowLabel $q ''
+      $detail=if($q.resetsAt){Format-ResetTime ([long]$q.resetsAt) ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())}else{'未提供重置时间'}
+      $parts+=$label+'：已用 '+([double]$q.used).ToString('0.#')+'%，'+$detail
     }
     ($parts+@($script:ui.Status.Text))-join "`n"
   }
@@ -371,6 +411,7 @@ function Format-ResetDisplay([long]$timestamp,[long]$now){
 }
 function Get-QuotaWindowLabel($Window,[string]$Fallback){
   if(!$Window){return $Fallback}
+  if($Window.kind-eq 'individual'){return '个人额度'}
   $minutes=[long]$Window.minutes
   if($minutes-eq 300){return '5 小时'}
   if($minutes-eq 10080){return '每周'}
@@ -379,9 +420,13 @@ function Get-QuotaWindowLabel($Window,[string]$Fallback){
   return ([string]$minutes)+' 分钟'
 }
 function Get-QuotaRows {
-  # Reuse the original two visual rows. A bucket has at most primary/secondary;
-  # generic windows occupy free rows, with no plan-specific duration whitelist.
+  # Reuse two visual rows and keep the original timed-window placement.
   $windows=@($script:status.windows|Where-Object{$null-ne $_}|Sort-Object minutes)
+  $individual=$windows|Where-Object{$_.kind-eq 'individual'}|Select-Object -First 1
+  if($individual){
+    $timed=$windows|Where-Object{$_.kind-ne 'individual'}|Sort-Object remaining,minutes|Select-Object -First 1
+    return @(@{prefix='Short';window=$individual;label='个人额度'},@{prefix='Week';window=$timed;label=(Get-QuotaWindowLabel $timed '其他额度')})
+  }
   $short=$windows|Where-Object{$_.minutes-eq 300}|Select-Object -First 1
   $week=$windows|Where-Object{$_.minutes-eq 10080}|Select-Object -First 1
   $other=@($windows|Where-Object{$_.minutes-notin @(300,10080)})
@@ -441,7 +486,9 @@ function Update-Quota {
   }
   $script:ui.LiveDot.Fill=[Windows.Media.BrushConverter]::new().ConvertFromString($dot)
   $script:ui.Status.ToolTip=$script:ui.Status.Text
-  $script:ui.Header.Text=if(!$script:status){'正在读取'}elseif(!$script:status.ok){'暂无法读取'}elseif($script:status.error -or $age-gt 180){'上次剩余额度'}else{'剩余额度'}
+  $headerState=if(!$script:status){'正在读取'}elseif(!$script:status.ok){'暂无法读取'}elseif($script:status.error -or $age-gt 180){'上次剩余额度'}else{'剩余额度'}
+  $planTitle=([string]$script:status.planLabel).Trim()
+  $script:ui.Header.Text=if($planTitle -and $planTitle-ne '未知套餐'){$planTitle+' · '+$headerState}else{$headerState}
   $script:ui.Header.ToolTip=if($script:status.planLabel){'当前套餐：'+$script:status.planLabel+' · 重置时间按本机时间显示'}else{'重置时间按本机时间显示'}
   Update-BubbleTooltip
   if($script:widgetColors){Update-WidgetColorScene}
@@ -476,6 +523,10 @@ $ex=[GptWidgetNative]::GetWindowLongPtr($script:widgetHandle,-20).ToInt64()
 [GptWidgetNative]::SetWindowLongPtr($script:widgetHandle,-20,[IntPtr]($ex-bor 0x08000000-bor 0x80))|Out-Null
 $source=[Windows.Interop.HwndSource]::FromHwnd($script:widgetHandle)
 $script:messageHook=[Windows.Interop.HwndSourceHook]{param($hwnd,$msg,$w,$l,[ref]$handled)
+  if($msg-eq 0x02E0 -or $msg-eq 0x007E -or $msg-eq 0x001A){
+    $script:lastPosition=$null
+    if($script:hostEventTimer -and !$script:hostEventTimer.IsEnabled){$script:hostEventTimer.Start()}
+  }
   if($msg-eq 0x84 -and !$script:drag){
     $packed=$l.ToInt64();$x=[int]($packed-band 65535);$y=[int](($packed-shr 16)-band 65535)
     if($x-ge 32768){$x-=65536};if($y-ge 32768){$y-=65536}
@@ -514,12 +565,12 @@ $pressMove={param($sender,$event)
   if($dx*$dx+$dy*$dy-lt 9 -and !$script:drag.moved){return}
   $script:drag.moved=$true
   if($script:hostHandle-eq [IntPtr]::Zero){return}
-  $frame=[GptWidgetNative]::Frame($script:hostHandle);$dpi=[GptWidgetNative]::GetDpiForWindow($script:hostHandle)/96.0
+  $frame=Get-WidgetVisibleFrame;$dpi=[GptWidgetNative]::GetDpiForWindow($script:hostHandle)/96.0
   if($dpi-le 0){$dpi=1}
-  $w=[int]($script:window.Width*$dpi);$h=[int]($script:window.Height*$dpi)
+  $w=Set-WidgetPixelSize $dpi;$h=$w
   $x=[int][Math]::Max($frame.Left,[Math]::Min($frame.Right-$w,$script:drag.left+$dx))
   $y=[int][Math]::Max($frame.Top,[Math]::Min($frame.Bottom-$h,$script:drag.top+$dy))
-  [GptWidgetNative]::SetWindowPos($script:widgetHandle,[IntPtr]::Zero,$x,$y,$w,$h,0x14)|Out-Null
+  [GptWidgetNative]::SetWindowPos($script:widgetHandle,[IntPtr]::Zero,$x,$y,0,0,0x15)|Out-Null
   $script:lastPosition=$null
   $script:offsetRight=($frame.Right-$x-$w)/$dpi;$script:offsetBottom=($frame.Bottom-$y-$h)/$dpi
   $script:offsetLeft=($x-$frame.Left)/$dpi;$script:anchor='free'
@@ -605,13 +656,14 @@ function Tick-Widget {
     if($script:attachedHost-ne $script:hostHandle){
       $script:attachedHost=$script:hostHandle;$script:lastPosition=$null
     }
-    if(!$script:window.IsVisible){$script:window.Show();$script:lastPosition=$null;Request-Refresh}
+    $showWidget=!$script:window.IsVisible
     if(!$script:drag){
-      $frame=[GptWidgetNative]::Frame($script:hostHandle);$dpi=[GptWidgetNative]::GetDpiForWindow($script:hostHandle)/96.0
+      $nativeFrame=[GptWidgetNative]::Frame($script:hostHandle)
+      $frame=Get-WidgetVisibleFrame;$dpi=[GptWidgetNative]::GetDpiForWindow($script:hostHandle)/96.0
       if($dpi-le 0){$dpi=1}
       $fitted=[Math]::Min($script:scale,[Math]::Min(($frame.Right-$frame.Left)/$dpi/378,($frame.Bottom-$frame.Top)/$dpi/378))
       if([Math]::Abs($script:displayScale-$fitted)-gt 0.001){Set-Appearance}
-      $w=[int]($script:window.Width*$dpi);$h=[int]($script:window.Height*$dpi)
+      $w=Set-WidgetPixelSize $dpi;$h=$w
       if($script:anchor-eq 'left'){$x=[int]($frame.Left+$script:offsetLeft*$dpi)}
       elseif($script:anchor-eq 'free'){
         if($null-eq $script:offsetLeft){$script:offsetLeft=[Math]::Max(0,($frame.Right-$frame.Left-$w)/$dpi-$script:offsetRight)}
@@ -621,13 +673,14 @@ function Tick-Widget {
       $y=[int][Math]::Max($frame.Top,$frame.Bottom-$h-$script:offsetBottom*$dpi)
       $position="$($script:hostHandle):$x,$y,$w,$h"
       if($position-ne $script:lastPosition){
-        [GptWidgetNative]::SetWindowPos($script:widgetHandle,[IntPtr]::Zero,$x,$y,$w,$h,0x14)|Out-Null
+        [GptWidgetNative]::SetWindowPos($script:widgetHandle,[IntPtr]::Zero,$x,$y,0,0,0x15)|Out-Null
         $script:lastPosition=$position
         if($script:context.IsOpen){Set-WidgetMenuBounds;Position-WidgetMenuToHost}
       }
-      $script:hostFollower.Configure($script:hostHandle,$frame.Left,$frame.Top,$frame.Right,$frame.Bottom,$w,$h,[int]($script:offsetLeft*$dpi),[int]($script:offsetRight*$dpi),[int]($script:offsetBottom*$dpi),$script:anchor,$true)
+      $script:hostFollower.Configure($script:hostHandle,$nativeFrame.Left,$nativeFrame.Top,$nativeFrame.Right,$nativeFrame.Bottom,$w,$h,[int]($script:offsetLeft*$dpi),[int]($script:offsetRight*$dpi),[int]($script:offsetBottom*$dpi),$script:anchor,$true)
     }
     $layer=Set-WidgetAboveHost $script:widgetHandle $script:hostHandle
+    if($showWidget){$script:window.Show();$script:lastPosition=$null;Request-Refresh}
   }elseif($script:window.IsVisible){
     $script:hostFollower.Suspend()
     $script:context.IsOpen=$false

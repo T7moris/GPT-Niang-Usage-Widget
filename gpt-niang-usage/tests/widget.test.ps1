@@ -8,7 +8,7 @@ $tokens=$null;$parseErrors=$null
 $source=[IO.File]::ReadAllText((Join-Path $appDir 'widget.ps1'),[Text.Encoding]::UTF8)
 $ast=[Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$parseErrors)
 if($parseErrors.Count){throw ($parseErrors|Out-String)}
-foreach($name in @('Reset-Label','Format-ResetTime','Format-ResetDisplay','Get-QuotaWindowLabel','Get-QuotaRows','Set-ResetTimeMode','Restart-SceneTtl','Tick-Scene','Apply-Scene','Update-BubbleTooltip','Update-Quota')){
+foreach($name in @('Set-Facing','Reset-Label','Format-ResetTime','Format-ResetDisplay','Get-QuotaWindowLabel','Get-QuotaRows','Set-ResetTimeMode','Restart-SceneTtl','Tick-Scene','Apply-Scene','Update-BubbleTooltip','Update-Quota')){
   $definition=$ast.Find({param($node)$node-is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name-eq $name},$true)
   . ([ScriptBlock]::Create($definition.Extent.Text))
 }
@@ -18,6 +18,7 @@ $null=New-Item -ItemType Directory -Path $script:dataDir
 $script:window=[Windows.Markup.XamlReader]::Parse([IO.File]::ReadAllText((Join-Path $appDir 'widget.xaml'),[Text.Encoding]::UTF8))
 $script:ui=@{}
 foreach($name in @('Root','Girl','Bubble','SceneText','QuotaText','Refresh','ShortRow','WeekRow','ShortLabel','WeekLabel','ShortUsed','ShortLeft','ShortReset','ShortBar','WeekUsed','WeekLeft','WeekReset','WeekBar','Status','LiveDot','Header','QuoteText')){$script:ui[$name]=$script:window.FindName($name)}
+foreach($name in @('FacingScale','TextFacingScale','MenuButton')){$script:ui[$name]=$script:window.FindName($name)}
 $script:ui.Girl.Source=[Windows.Media.Imaging.BitmapImage]::new([Uri](Join-Path $appDir 'assets\gpt-dragon-niang-bust.png'))
 $script:bubbleMode='quota';$script:status=$null;$script:statusStamp=0
 $script:resetTimeMode='fixed';$script:resetPhaseTimer=$null;$script:collapsed=$true;$script:closeCount=0
@@ -46,6 +47,17 @@ function Save-Preview([string]$name,[double]$scale=1){
 function Assert-QuotaLayout {
   $scene=$script:window.FindName('SceneText');$root=$script:ui.Root
   $root.Measure([Windows.Size]::new(350,350));$root.Arrange([Windows.Rect]::new(0,0,350,350));$root.UpdateLayout()
+  $header=$script:ui.Header;$headerOrigin=$header.TranslatePoint([Windows.Point]::new(0,0),$scene)
+  if($headerOrigin.X-lt -0.5 -or $headerOrigin.X+$header.ActualWidth-gt $scene.ActualWidth+0.5 -or $header.ActualHeight-gt 16.5){throw 'Quota title escapes its single-line bounds'}
+  $refresh=$script:ui.Refresh;$refreshOrigin=$refresh.TranslatePoint([Windows.Point]::new(0,0),$scene)
+  if($headerOrigin.X+$header.ActualWidth+3-gt $refreshOrigin.X){throw 'Refresh button overlaps title or loses its gap'}
+  if([Math]::Abs(($headerOrigin.Y+$header.ActualHeight/2)-($refreshOrigin.Y+$refresh.ActualHeight/2))-gt 0.5){throw 'Refresh and title are not on the same line'}
+  if($refreshOrigin.X+$refresh.ActualWidth-gt $scene.ActualWidth+0.5){throw 'Refresh escapes the text area'}
+  if(!$refresh.IsHitTestVisible){throw 'Refresh is blocked by a non-interactive ancestor'}
+  $buttonCenter=$refresh.TranslatePoint([Windows.Point]::new($refresh.ActualWidth/2,$refresh.ActualHeight/2),$root)
+  $hit=$root.InputHitTest($buttonCenter)
+  while($hit -and $hit-ne $refresh){$hit=[Windows.Media.VisualTreeHelper]::GetParent($hit)}
+  if($hit-ne $refresh){throw "Refresh cannot receive pointer input: center=$buttonCenter visible=$($refresh.IsVisible) root=$($root.IsVisible) hit=$($root.InputHitTest($buttonCenter))"}
   foreach($prefix in @('Short','Week')){
     if($script:ui[$prefix+'Row'].Visibility-eq [Windows.Visibility]::Collapsed){continue}
     foreach($suffix in @('Left','Reset','Bar')){
@@ -62,6 +74,9 @@ function Assert-QuotaLayout {
   }
 }
 try{
+  # An invisible test HWND makes IsVisible/input routing real without flashing
+  # a second widget on the desktop. Preview rendering still targets its content.
+  $script:window.Opacity=0;$script:window.Show()
   $localClock=[DateTime]::new(2026,10,5,23,30,0)
   $clock=[DateTimeOffset]::new($localClock,[TimeZoneInfo]::Local.GetUtcOffset($localClock)).ToUnixTimeSeconds()
   Assert-Equal (Format-ResetTime ($clock+1200) $clock) '今日 23:50 重置' 'Machine-local same-day reset'
@@ -250,6 +265,62 @@ try{
   Assert-Equal $script:ui.WeekLabel.Text '30 天' 'Second generic row'
   Assert-QuotaLayout
   Save-Preview 'pro-generic-two-windows'
+  $individual=@{kind='individual';minutes=$null;used=52;remaining=48;resetsAt=$short.resetsAt;total=4000;amountUsed=2082.88;amountRemaining=1917.12}
+  Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel='Business';windows=@($individual)}
+  Assert-Equal $script:ui.ShortLabel.Text '个人额度' 'Business personal cap label does not invent a period'
+  Assert-Equal $script:ui.Header.Text 'Business · 剩余额度' 'Business plan precedes quota title'
+  Assert-Equal $script:ui.ShortLeft.Text '48%' 'Official personal remaining percentage'
+  Assert-Equal $script:ui.ShortUsed.Text '已用 52%' 'Personal used percentage'
+  Assert-Equal $script:ui.ShortBar.Width (184*0.48) 'Personal progress bar'
+  Assert-Equal $script:ui.WeekRow.Visibility Collapsed 'Personal-only cap hides unsupported week row'
+  if(!$script:bubbleTooltipText.Text.Contains('2082.88') -or !$script:bubbleTooltipText.Text.Contains('非公司总余额')){throw 'Personal amount or scope missing from tooltip'}
+  Assert-QuotaLayout;Save-Preview 'business-individual'
+  Set-ResetTimeMode 'countdown' $now
+  Assert-Equal $script:ui.ShortReset.Text (Reset-Label ($individual.resetsAt-[Math]::Floor($now/1000))) 'Personal reset countdown'
+  Set-ResetTimeMode 'fixed' $now
+  Assert-Equal $script:ui.ShortReset.Text (Format-ResetTime $individual.resetsAt ([Math]::Floor($now/1000))) 'Personal reset date'
+  Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel='Business';windows=@($individual,$short,$week)}
+  Assert-Equal $script:ui.WeekLabel.Text '5 小时' 'Most restrictive timed window is visible alongside cap'
+  if(!$script:bubbleTooltipText.Text.Contains('每周')){throw 'Third quota omitted from tooltip'}
+  Assert-QuotaLayout;Save-Preview 'business-mixed'
+  $individual.remaining=0;$individual.used=100;$individual.resetsAt=$null
+  Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel='Business';windows=@($individual)}
+  Assert-Equal $script:ui.ShortLeft.Text '0%' 'Exhausted personal cap remains visible'
+  Assert-Equal $script:ui.ShortReset.Text '未提供重置时间' 'Unknown personal reset is not fabricated'
+  Assert-QuotaLayout
+  Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel='Plus';windows=@($short,$week)}
+  Assert-Equal $script:ui.ShortLabel.Text '5 小时' 'Switching back restores personal plan layout'
+  if($script:bubbleTooltipText.Text.Contains('非公司总余额')){throw 'Business details leaked after switching accounts'}
+  foreach($plan in @('Free','Go','Plus','Pro','Team','Business','Enterprise','Edu')){
+    Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel=$plan;windows=@($short,$week)}
+    Assert-Equal $script:ui.Header.Text ($plan+' · 剩余额度') 'Plan heading updates with account'
+    Assert-QuotaLayout
+    $header=$script:ui.Header
+    $typeface=[Windows.Media.Typeface]::new($header.FontFamily,$header.FontStyle,$header.FontWeight,$header.FontStretch)
+    $measured=[Windows.Media.FormattedText]::new($header.Text,[Globalization.CultureInfo]::InvariantCulture,[Windows.FlowDirection]::LeftToRight,$typeface,$header.FontSize,$header.Foreground)
+    if($measured.Width-gt $header.MaxWidth){throw 'Known plan title is truncated'}
+    Save-Preview ('header-'+$plan)
+  }
+  Set-Snapshot @{ok=$true;queryOk=$false;observedAt=$now;planLabel='Business';error='查询超时';windows=@($individual)}
+  Assert-Equal $script:ui.Header.Text 'Business · 上次剩余额度' 'Cached heading keeps plan and stale indicator'
+  Assert-QuotaLayout;Save-Preview 'header-business-stale'
+  Set-Snapshot @{ok=$false;queryOk=$false;planLabel='Business';windows=@()}
+  Assert-Equal $script:ui.Header.Text 'Business · 暂无法读取' 'Known plan survives a read error'
+  Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel=('FuturePlan'*10);windows=@($short)}
+  Assert-QuotaLayout
+  Assert-Equal $script:ui.Header.TextTrimming CharacterEllipsis 'Long future plan names stay within bubble'
+  if(!$script:ui.Header.ToolTip.Contains(('FuturePlan'*10))){throw 'Full long plan name missing from tooltip'}
+  Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel='未知套餐';windows=@($short)}
+  Assert-Equal $script:ui.Header.Text '剩余额度' 'Unknown plan does not clutter heading'
+  foreach($side in @('left','right')){
+    $script:side=$side;Set-Facing
+    Assert-Equal $script:ui.Refresh.RenderTransform.Value.M11 1 'Refresh must not be mirrored twice'
+    foreach($rows in @(@($individual),@($short,$week))){
+      Set-Snapshot @{ok=$true;queryOk=$true;observedAt=$now;planLabel='Enterprise';windows=$rows}
+      Assert-QuotaLayout
+      foreach($scale in @(0.6,1,1.4,2.5)){Save-Preview ('refresh-'+$side+'-'+$rows.Count+'-'+$scale) $scale}
+    }
+  }
   Remove-Item -LiteralPath (Join-Path $script:dataDir 'status.json')
   Update-Quota
   Assert-Equal $script:status $null 'Removed snapshot is cleared'
