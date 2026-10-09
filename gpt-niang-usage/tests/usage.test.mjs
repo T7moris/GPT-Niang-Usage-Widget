@@ -7,6 +7,79 @@ import {fileURLToPath} from 'node:url';
 import {normalizeLimits,freshness,readUsage,accountFingerprint} from '../runtime/usage.mjs';
 import {mergeUsageSnapshot} from '../runtime/refresh-queue.mjs';
 const w=(used=10,mins=300)=>({usedPercent:used,windowDurationMins:mins,resetsAt:2000000000});
+const individual=(overrides={})=>({limit:'4000',used:'2082.8820300102234',remainingPercent:48,resetsAt:2000000000,...overrides});
+test('Business personal cap works without primary or secondary windows',()=>{
+  const r=normalizeLimits({rateLimitsByLimitId:{codex:{planType:'business',primary:null,secondary:null,individualLimit:individual()}}},1000);
+  assert.equal(r.ok,true);assert.equal(r.queryOk,true);assert.equal(r.plan,'business');
+  assert.equal(r.windows.length,1);
+  const q=r.windows[0];
+  assert.equal(q.kind,'individual');assert.equal(q.label,'个人额度');assert.equal(q.minutes,null);
+  assert.equal(q.remaining,48);assert.equal(q.used,52);assert.equal(q.total,4000);
+  assert.equal(q.amountUsed,2082.8820300102234);assert.equal(q.amountRemaining,4000-q.amountUsed);
+  assert.equal(q.resetsAt,2000000000);
+});
+test('personal cap coexists with timed windows without discarding either',()=>{
+  const r=normalizeLimits({rateLimits:{individualLimit:individual(),primary:w(10),secondary:w(80,10080)}});
+  assert.equal(r.windows.length,3);assert.equal(r.queryOk,true);
+  assert.deepEqual(r.windows.map(q=>q.remaining),[48,90,20]);
+});
+test('personal cap preserves exhausted, zero, full and decimal percentages',()=>{
+  for(const remainingPercent of [0,0.1,48,100]){
+    const q=normalizeLimits({rateLimits:{individualLimit:individual({remainingPercent})}}).windows[0];
+    assert.equal(q.remaining,remainingPercent);assert.equal(q.used,100-remainingPercent);
+  }
+  const zero=normalizeLimits({rateLimits:{individualLimit:individual({limit:'0',used:'0',remainingPercent:0})}}).windows[0];
+  assert.equal(zero.remaining,0);assert.equal(zero.amountRemaining,0);
+});
+test('derive a missing personal percentage only from valid amounts',()=>{
+  for(const remainingPercent of [null,undefined]){
+    const q=normalizeLimits({rateLimits:{individualLimit:individual({limit:'4000',used:'1000',remainingPercent})}}).windows[0];
+    assert.equal(q.remaining,75);
+  }
+  const q=normalizeLimits({rateLimits:{individualLimit:individual({used:4500,remainingPercent:null})}}).windows[0];
+  assert.equal(q.remaining,0);assert.equal(q.amountRemaining,0);
+  for(const limit of [null,'', ' ',false,[],{},'NaN','Infinity',-1,'-1',0]){
+    const r=normalizeLimits({rateLimits:{individualLimit:individual({limit,remainingPercent:null})}});
+    assert.equal(r.ok,false);assert.equal(r.queryOk,false);
+  }
+});
+test('malformed personal percentages are not replaced by guessed healthy values',()=>{
+  for(const raw of [false,[],{},individual({remainingPercent:-1}),individual({remainingPercent:101}),individual({remainingPercent:'48'}),individual({remainingPercent:NaN})]){
+    const r=normalizeLimits({rateLimits:{individualLimit:raw}});
+    assert.equal(r.ok,false);assert.equal(r.queryOk,false);assert.equal(r.errorCode,'INVALID_WINDOWS');
+  }
+  assert.equal(normalizeLimits({rateLimits:{individualLimit:null}}).errorCode,'NO_WINDOWS');
+});
+test('personal reset and unknown amount fields remain unavailable, never invented',()=>{
+  const r=normalizeLimits({rateLimits:{individualLimit:individual({limit:null,used:null,resetsAt:null})}},1000);
+  assert.equal(r.ok,true);assert.equal(r.windows[0].total,null);assert.equal(r.windows[0].amountRemaining,null);
+  assert.equal(r.windows[0].resetsAt,null);assert.equal(freshness(r.windows[0],1000,2000),'fresh');
+  const expired=normalizeLimits({rateLimits:{individualLimit:individual({resetsAt:1})}},1000);
+  assert.equal(freshness(expired.windows[0],1000,2000),'expired');
+});
+test('personal cap survives the read-only RPC and account snapshot pipeline',async()=>{
+  const calls=[];
+  const spawnProcess=()=>{
+    const proc=new EventEmitter();
+    proc.stdin=new PassThrough();proc.stdout=new PassThrough();proc.stderr=new PassThrough();proc.kill=()=>{};
+    proc.stdin.on('data',chunk=>{
+      for(const line of chunk.toString().trim().split('\n')){
+        const request=JSON.parse(line);calls.push(request.method);
+        if(request.id===undefined)continue;
+        const result=request.id===1?{}:request.id===2?{account:{type:'chatgpt',email:'test@example.test',planType:'business'}}:{rateLimits:{planType:'business',individualLimit:individual()}};
+        queueMicrotask(()=>proc.stdout.write(JSON.stringify({id:request.id,result})+'\n'));
+      }
+    });return proc;
+  };
+  const r=await readUsage('fake',{spawnProcess});
+  assert.equal(r.ok,true);assert.equal(r.clearPrevious,false);assert.equal(r.windows[0].remaining,48);
+  assert.deepEqual(calls,['initialize','initialized','account/read','account/rateLimits/read']);
+  const personal={...normalizeLimits({rateLimits:{primary:w(1)}}),accountKey:'personal'};
+  const switched=mergeUsageSnapshot(personal,r);
+  assert.equal(switched.windows.length,1);assert.equal(switched.windows[0].kind,'individual');
+  const unavailable={ok:false,queryOk:true,clearPrevious:true,windows:[],accountKey:r.accountKey};
+  assert.deepEqual(mergeUsageSnapshot(switched,unavailable).windows,[]);
+});
 test('prefer current codex bucket over legacy and unrelated model buckets',()=>{
   const r=normalizeLimits({rateLimits:{primary:w(90)},rateLimitsByLimitId:{codex:{primary:w(12),secondary:w(61,10080)},other:{primary:w(98)}}},1000);
   assert.deepEqual(r.windows.map(x=>[x.minutes,x.used,x.remaining]),[[300,12,88],[10080,61,39]]);

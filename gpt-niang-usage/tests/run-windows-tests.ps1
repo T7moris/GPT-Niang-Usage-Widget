@@ -6,7 +6,7 @@ if($WidgetOnly){
   return
 }
 $powerShell=Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-foreach($name in @('installation.test.ps1','lifecycle.test.ps1','entrypoint.test.ps1','quote-layout.test.ps1')){
+foreach($name in @('installation.test.ps1','lifecycle.test.ps1','entrypoint.test.ps1','quote-layout.test.ps1','display.test.ps1')){
   & $powerShell -NoProfile -STA -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot $name)
   if($LASTEXITCODE-ne 0){throw "$name failed ($LASTEXITCODE)"}
 }

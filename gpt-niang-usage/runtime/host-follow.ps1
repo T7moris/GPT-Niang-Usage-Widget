@@ -7,6 +7,9 @@ using System.Runtime.InteropServices;
 // a DispatcherTimer here makes a separate transparent window trail its host.
 public sealed class GptWidgetHostFollower : IDisposable {
  [StructLayout(LayoutKind.Sequential)] struct Rect {public int Left,Top,Right,Bottom;}
+ [StructLayout(LayoutKind.Sequential)] struct MonitorInfo {public int Size;public Rect Monitor,Work;public uint Flags;}
+ [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr h,uint flags);
+ [DllImport("user32.dll")] static extern bool GetMonitorInfo(IntPtr monitor,ref MonitorInfo info);
  delegate void WinEventProc(IntPtr hook,uint ev,IntPtr hwnd,int objectId,int childId,uint threadId,uint time);
  [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint first,uint last,IntPtr module,WinEventProc callback,uint processId,uint threadId,uint flags);
  [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
@@ -36,6 +39,16 @@ public sealed class GptWidgetHostFollower : IDisposable {
  public bool Moving {get;private set;}
  public bool Ready {get{return locationHook!=IntPtr.Zero;}}
  public GptWidgetHostFollower(IntPtr widget){this.widget=widget;callback=OnEvent;}
+ public static int[] VisibleBounds(IntPtr host,int left,int top,int right,int bottom){
+  var info=new MonitorInfo();info.Size=Marshal.SizeOf(typeof(MonitorInfo));
+  if(GetMonitorInfo(MonitorFromWindow(host,2),ref info)){
+   int l=Math.Max(left,info.Work.Left),t=Math.Max(top,info.Work.Top);
+   int r=Math.Min(right,info.Work.Right),b=Math.Min(bottom,info.Work.Bottom);
+   if(r>l&&b>t)return new[]{l,t,r,b};
+   return new[]{info.Work.Left,info.Work.Top,info.Work.Right,info.Work.Bottom};
+  }
+  return new[]{left,top,right,bottom};
+ }
 
  public void Configure(IntPtr host,int frameLeft,int frameTop,int frameRight,int frameBottom,
                        int width,int height,int left,int right,int bottom,string anchor,bool enabled){
@@ -86,6 +99,8 @@ public sealed class GptWidgetHostFollower : IDisposable {
    LayoutDirty=true;if(LayoutRequested!=null)LayoutRequested();
   }
   frame.Left+=insetLeft;frame.Top+=insetTop;frame.Right-=insetRight;frame.Bottom-=insetBottom;
+  var bounds=VisibleBounds(host,frame.Left,frame.Top,frame.Right,frame.Bottom);
+  frame.Left=bounds[0];frame.Top=bounds[1];frame.Right=bounds[2];frame.Bottom=bounds[3];
   int x=anchor=="right"?frame.Right-width-right:frame.Left+left;
   x=Math.Max(frame.Left,Math.Min(frame.Right-width,x));
   int y=Math.Max(frame.Top,frame.Bottom-height-bottom);
